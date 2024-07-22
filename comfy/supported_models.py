@@ -1,4 +1,4 @@
-import torch
+import oneflow as torch
 from . import model_base
 from . import utils
 
@@ -13,6 +13,7 @@ from . import supported_models_base
 from . import latent_formats
 
 from . import diffusers_convert
+
 
 class SD15(supported_models_base.BASE):
     unet_config = {
@@ -37,10 +38,10 @@ class SD15(supported_models_base.BASE):
                 y = x.replace("cond_stage_model.transformer.", "cond_stage_model.transformer.text_model.")
                 state_dict[y] = state_dict.pop(x)
 
-        if 'cond_stage_model.transformer.text_model.embeddings.position_ids' in state_dict:
-            ids = state_dict['cond_stage_model.transformer.text_model.embeddings.position_ids']
+        if "cond_stage_model.transformer.text_model.embeddings.position_ids" in state_dict:
+            ids = state_dict["cond_stage_model.transformer.text_model.embeddings.position_ids"]
             if ids.dtype == torch.float32:
-                state_dict['cond_stage_model.transformer.text_model.embeddings.position_ids'] = ids.round()
+                state_dict["cond_stage_model.transformer.text_model.embeddings.position_ids"] = ids.round()
 
         replace_prefix = {}
         replace_prefix["cond_stage_model."] = "clip_l."
@@ -58,6 +59,7 @@ class SD15(supported_models_base.BASE):
 
     def clip_target(self, state_dict={}):
         return supported_models_base.ClipTarget(sd1_clip.SD1Tokenizer, sd1_clip.SD1ClipModel)
+
 
 class SD20(supported_models_base.BASE):
     unet_config = {
@@ -77,16 +79,16 @@ class SD20(supported_models_base.BASE):
     latent_format = latent_formats.SD15
 
     def model_type(self, state_dict, prefix=""):
-        if self.unet_config["in_channels"] == 4: #SD2.0 inpainting models are not v prediction
+        if self.unet_config["in_channels"] == 4:  # SD2.0 inpainting models are not v prediction
             k = "{}output_blocks.11.1.transformer_blocks.0.norm1.bias".format(prefix)
             out = state_dict.get(k, None)
-            if out is not None and torch.std(out, unbiased=False) > 0.09: # not sure how well this will actually work. I guess we will find out.
+            if out is not None and torch.std(out, unbiased=False) > 0.09:  # not sure how well this will actually work. I guess we will find out.
                 return model_base.ModelType.V_PREDICTION
         return model_base.ModelType.EPS
 
     def process_clip_state_dict(self, state_dict):
         replace_prefix = {}
-        replace_prefix["conditioner.embedders.0.model."] = "clip_h." #SD2 in sgm format
+        replace_prefix["conditioner.embedders.0.model."] = "clip_h."  # SD2 in sgm format
         replace_prefix["cond_stage_model.model."] = "clip_h."
         state_dict = utils.state_dict_prefix_replace(state_dict, replace_prefix, filter_keys=True)
         state_dict = utils.clip_text_transformers_convert(state_dict, "clip_h.", "clip_h.transformer.")
@@ -101,6 +103,7 @@ class SD20(supported_models_base.BASE):
 
     def clip_target(self, state_dict={}):
         return supported_models_base.ClipTarget(sd2_clip.SD2Tokenizer, sd2_clip.SD2ClipModel)
+
 
 class SD21UnclipL(SD20):
     unet_config = {
@@ -126,6 +129,7 @@ class SD21UnclipH(SD20):
 
     clip_vision_prefix = "embedder.model.visual."
     noise_aug_config = {"noise_schedule_config": {"timesteps": 1000, "beta_schedule": "squaredcos_cap_v2"}, "timestep_dim": 1024}
+
 
 class SDXLRefiner(supported_models_base.BASE):
     unet_config = {
@@ -164,6 +168,7 @@ class SDXLRefiner(supported_models_base.BASE):
     def clip_target(self, state_dict={}):
         return supported_models_base.ClipTarget(sdxl_clip.SDXLTokenizer, sdxl_clip.SDXLRefinerClipModel)
 
+
 class SDXL(supported_models_base.BASE):
     unet_config = {
         "model_channels": 320,
@@ -177,7 +182,7 @@ class SDXL(supported_models_base.BASE):
     latent_format = latent_formats.SDXL
 
     def model_type(self, state_dict, prefix=""):
-        if 'edm_mean' in state_dict and 'edm_std' in state_dict: #Playground V2.5
+        if "edm_mean" in state_dict and "edm_std" in state_dict:  # Playground V2.5
             self.latent_format = latent_formats.SDXL_Playground_2_5()
             self.sampling_settings["sigma_data"] = 0.5
             self.sampling_settings["sigma_max"] = 80.0
@@ -233,6 +238,7 @@ class SDXL(supported_models_base.BASE):
     def clip_target(self, state_dict={}):
         return supported_models_base.ClipTarget(sdxl_clip.SDXLTokenizer, sdxl_clip.SDXLClipModel)
 
+
 class SSD1B(SDXL):
     unet_config = {
         "model_channels": 320,
@@ -242,6 +248,7 @@ class SSD1B(SDXL):
         "adm_in_channels": 2816,
         "use_temporal_attention": False,
     }
+
 
 class Segmind_Vega(SDXL):
     unet_config = {
@@ -253,6 +260,7 @@ class Segmind_Vega(SDXL):
         "use_temporal_attention": False,
     }
 
+
 class KOALA_700M(SDXL):
     unet_config = {
         "model_channels": 320,
@@ -262,6 +270,7 @@ class KOALA_700M(SDXL):
         "adm_in_channels": 2816,
         "use_temporal_attention": False,
     }
+
 
 class KOALA_1B(SDXL):
     unet_config = {
@@ -273,6 +282,7 @@ class KOALA_1B(SDXL):
         "use_temporal_attention": False,
     }
 
+
 class SVD_img2vid(supported_models_base.BASE):
     unet_config = {
         "model_channels": 320,
@@ -282,7 +292,7 @@ class SVD_img2vid(supported_models_base.BASE):
         "context_dim": 1024,
         "adm_in_channels": 768,
         "use_temporal_attention": True,
-        "use_temporal_resblock": True
+        "use_temporal_resblock": True,
     }
 
     unet_extra_config = {
@@ -304,6 +314,7 @@ class SVD_img2vid(supported_models_base.BASE):
     def clip_target(self, state_dict={}):
         return None
 
+
 class SV3D_u(SVD_img2vid):
     unet_config = {
         "model_channels": 320,
@@ -313,7 +324,7 @@ class SV3D_u(SVD_img2vid):
         "context_dim": 1024,
         "adm_in_channels": 256,
         "use_temporal_attention": True,
-        "use_temporal_resblock": True
+        "use_temporal_resblock": True,
     }
 
     vae_key_prefix = ["conditioner.embedders.1.encoder."]
@@ -321,6 +332,7 @@ class SV3D_u(SVD_img2vid):
     def get_model(self, state_dict, prefix="", device=None):
         out = model_base.SV3D_u(self, device=device)
         return out
+
 
 class SV3D_p(SV3D_u):
     unet_config = {
@@ -331,13 +343,13 @@ class SV3D_p(SV3D_u):
         "context_dim": 1024,
         "adm_in_channels": 1280,
         "use_temporal_attention": True,
-        "use_temporal_resblock": True
+        "use_temporal_resblock": True,
     }
-
 
     def get_model(self, state_dict, prefix="", device=None):
         out = model_base.SV3D_p(self, device=device)
         return out
+
 
 class Stable_Zero123(supported_models_base.BASE):
     unet_config = {
@@ -364,17 +376,20 @@ class Stable_Zero123(supported_models_base.BASE):
     latent_format = latent_formats.SD15
 
     def get_model(self, state_dict, prefix="", device=None):
-        out = model_base.Stable_Zero123(self, device=device, cc_projection_weight=state_dict["cc_projection.weight"], cc_projection_bias=state_dict["cc_projection.bias"])
+        out = model_base.Stable_Zero123(
+            self, device=device, cc_projection_weight=state_dict["cc_projection.weight"], cc_projection_bias=state_dict["cc_projection.bias"]
+        )
         return out
 
     def clip_target(self, state_dict={}):
         return None
 
+
 class SD_X4Upscaler(SD20):
     unet_config = {
         "context_dim": 1024,
         "model_channels": 256,
-        'in_channels': 7,
+        "in_channels": 7,
         "use_linear_in_transformer": True,
         "adm_in_channels": None,
         "use_temporal_attention": False,
@@ -398,9 +413,10 @@ class SD_X4Upscaler(SD20):
         out = model_base.SD_X4Upscaler(self, device=device)
         return out
 
+
 class Stable_Cascade_C(supported_models_base.BASE):
     unet_config = {
-        "stable_cascade_stage": 'c',
+        "stable_cascade_stage": "c",
     }
 
     unet_extra_config = {}
@@ -423,12 +439,12 @@ class Stable_Cascade_C(supported_models_base.BASE):
             keys = filter(lambda a: a.endswith(suffix), key_list)
             for k_from in keys:
                 weights = state_dict.pop(k_from)
-                prefix = k_from[:-(len(suffix) + 1)]
+                prefix = k_from[: -(len(suffix) + 1)]
                 shape_from = weights.shape[0] // 3
                 for x in range(3):
                     p = ["to_q", "to_k", "to_v"]
                     k_to = "{}.{}.{}".format(prefix, p[x], y)
-                    state_dict[k_to] = weights[shape_from*x:shape_from*(x + 1)]
+                    state_dict[k_to] = weights[shape_from * x : shape_from * (x + 1)]
         return state_dict
 
     def process_clip_state_dict(self, state_dict):
@@ -444,9 +460,10 @@ class Stable_Cascade_C(supported_models_base.BASE):
     def clip_target(self, state_dict={}):
         return supported_models_base.ClipTarget(sdxl_clip.StableCascadeTokenizer, sdxl_clip.StableCascadeClipModel)
 
+
 class Stable_Cascade_B(Stable_Cascade_C):
     unet_config = {
-        "stable_cascade_stage": 'b',
+        "stable_cascade_stage": "b",
     }
 
     unet_extra_config = {}
@@ -464,6 +481,7 @@ class Stable_Cascade_B(Stable_Cascade_C):
         out = model_base.StableCascade_B(self, device=device)
         return out
 
+
 class SD15_instructpix2pix(SD15):
     unet_config = {
         "context_dim": 768,
@@ -476,6 +494,7 @@ class SD15_instructpix2pix(SD15):
 
     def get_model(self, state_dict, prefix="", device=None):
         return model_base.SD15_instructpix2pix(self, device=device)
+
 
 class SDXL_instructpix2pix(SDXL):
     unet_config = {
@@ -490,6 +509,7 @@ class SDXL_instructpix2pix(SDXL):
 
     def get_model(self, state_dict, prefix="", device=None):
         return model_base.SDXL_instructpix2pix(self, model_type=self.model_type(state_dict, prefix), device=device)
+
 
 class SD3(supported_models_base.BASE):
     unet_config = {
@@ -524,7 +544,10 @@ class SD3(supported_models_base.BASE):
             t5 = True
             dtype_t5 = state_dict[t5_key].dtype
 
-        return supported_models_base.ClipTarget(comfy.text_encoders.sd3_clip.SD3Tokenizer, comfy.text_encoders.sd3_clip.sd3_clip(clip_l=clip_l, clip_g=clip_g, t5=t5, dtype_t5=dtype_t5))
+        return supported_models_base.ClipTarget(
+            comfy.text_encoders.sd3_clip.SD3Tokenizer, comfy.text_encoders.sd3_clip.sd3_clip(clip_l=clip_l, clip_g=clip_g, t5=t5, dtype_t5=dtype_t5)
+        )
+
 
 class StableAudio(supported_models_base.BASE):
     unet_config = {
@@ -546,7 +569,7 @@ class StableAudio(supported_models_base.BASE):
 
     def process_unet_state_dict(self, state_dict):
         for k in list(state_dict.keys()):
-            if k.endswith(".cross_attend_norm.beta") or k.endswith(".ff_norm.beta") or k.endswith(".pre_norm.beta"): #These weights are all zero
+            if k.endswith(".cross_attend_norm.beta") or k.endswith(".ff_norm.beta") or k.endswith(".pre_norm.beta"):  # These weights are all zero
                 state_dict.pop(k)
         return state_dict
 
@@ -556,6 +579,7 @@ class StableAudio(supported_models_base.BASE):
 
     def clip_target(self, state_dict={}):
         return supported_models_base.ClipTarget(comfy.text_encoders.sa_t5.SAT5Tokenizer, comfy.text_encoders.sa_t5.SAT5Model)
+
 
 class AuraFlow(supported_models_base.BASE):
     unet_config = {
@@ -580,6 +604,29 @@ class AuraFlow(supported_models_base.BASE):
     def clip_target(self, state_dict={}):
         return supported_models_base.ClipTarget(comfy.text_encoders.aura_t5.AuraT5Tokenizer, comfy.text_encoders.aura_t5.AuraT5Model)
 
-models = [Stable_Zero123, SD15_instructpix2pix, SD15, SD20, SD21UnclipL, SD21UnclipH, SDXL_instructpix2pix, SDXLRefiner, SDXL, SSD1B, KOALA_700M, KOALA_1B, Segmind_Vega, SD_X4Upscaler, Stable_Cascade_C, Stable_Cascade_B, SV3D_u, SV3D_p, SD3, StableAudio, AuraFlow]
+
+models = [
+    Stable_Zero123,
+    SD15_instructpix2pix,
+    SD15,
+    SD20,
+    SD21UnclipL,
+    SD21UnclipH,
+    SDXL_instructpix2pix,
+    SDXLRefiner,
+    SDXL,
+    SSD1B,
+    KOALA_700M,
+    KOALA_1B,
+    Segmind_Vega,
+    SD_X4Upscaler,
+    Stable_Cascade_C,
+    Stable_Cascade_B,
+    SV3D_u,
+    SV3D_p,
+    SD3,
+    StableAudio,
+    AuraFlow,
+]
 
 models += [SVD_img2vid]

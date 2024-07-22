@@ -1,7 +1,8 @@
-#code originally taken from: https://github.com/ChenyangSi/FreeU (under MIT License)
+# code originally taken from: https://github.com/ChenyangSi/FreeU (under MIT License)
 
-import torch
+import oneflow as torch
 import logging
+
 
 def Fourier_filter(x, threshold, scale):
     # FFT
@@ -11,8 +12,8 @@ def Fourier_filter(x, threshold, scale):
     B, C, H, W = x_freq.shape
     mask = torch.ones((B, C, H, W), device=x.device)
 
-    crow, ccol = H // 2, W //2
-    mask[..., crow - threshold:crow + threshold, ccol - threshold:ccol + threshold] = scale
+    crow, ccol = H // 2, W // 2
+    mask[..., crow - threshold : crow + threshold, ccol - threshold : ccol + threshold] = scale
     x_freq = x_freq * mask
 
     # IFFT
@@ -25,12 +26,16 @@ def Fourier_filter(x, threshold, scale):
 class FreeU:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                             "b1": ("FLOAT", {"default": 1.1, "min": 0.0, "max": 10.0, "step": 0.01}),
-                             "b2": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 10.0, "step": 0.01}),
-                             "s1": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 10.0, "step": 0.01}),
-                             "s2": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 10.0, "step": 0.01}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "b1": ("FLOAT", {"default": 1.1, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "b2": ("FLOAT", {"default": 1.2, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "s1": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "s2": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 10.0, "step": 0.01}),
+            }
+        }
+
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
 
@@ -44,7 +49,7 @@ class FreeU:
         def output_block_patch(h, hsp, transformer_options):
             scale = scale_dict.get(int(h.shape[1]), None)
             if scale is not None:
-                h[:,:h.shape[1] // 2] = h[:,:h.shape[1] // 2] * scale[0]
+                h[:, : h.shape[1] // 2] = h[:, : h.shape[1] // 2] * scale[0]
                 if hsp.device not in on_cpu_devices:
                     try:
                         hsp = Fourier_filter(hsp, threshold=1, scale=scale[1])
@@ -59,17 +64,22 @@ class FreeU:
 
         m = model.clone()
         m.set_model_output_block_patch(output_block_patch)
-        return (m, )
+        return (m,)
+
 
 class FreeU_V2:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                             "b1": ("FLOAT", {"default": 1.3, "min": 0.0, "max": 10.0, "step": 0.01}),
-                             "b2": ("FLOAT", {"default": 1.4, "min": 0.0, "max": 10.0, "step": 0.01}),
-                             "s1": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 10.0, "step": 0.01}),
-                             "s2": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 10.0, "step": 0.01}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "b1": ("FLOAT", {"default": 1.3, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "b2": ("FLOAT", {"default": 1.4, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "s1": ("FLOAT", {"default": 0.9, "min": 0.0, "max": 10.0, "step": 0.01}),
+                "s2": ("FLOAT", {"default": 0.2, "min": 0.0, "max": 10.0, "step": 0.01}),
+            }
+        }
+
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
 
@@ -89,7 +99,7 @@ class FreeU_V2:
                 hidden_min, _ = torch.min(hidden_mean.view(B, -1), dim=-1, keepdim=True)
                 hidden_mean = (hidden_mean - hidden_min.unsqueeze(2).unsqueeze(3)) / (hidden_max - hidden_min).unsqueeze(2).unsqueeze(3)
 
-                h[:,:h.shape[1] // 2] = h[:,:h.shape[1] // 2] * ((scale[0] - 1 ) * hidden_mean + 1)
+                h[:, : h.shape[1] // 2] = h[:, : h.shape[1] // 2] * ((scale[0] - 1) * hidden_mean + 1)
 
                 if hsp.device not in on_cpu_devices:
                     try:
@@ -105,7 +115,8 @@ class FreeU_V2:
 
         m = model.clone()
         m.set_model_output_block_patch(output_block_patch)
-        return (m, )
+        return (m,)
+
 
 NODE_CLASS_MAPPINGS = {
     "FreeU": FreeU,

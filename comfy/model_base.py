@@ -1,4 +1,4 @@
-import torch
+import oneflow as torch
 import logging
 from comfy.ldm.modules.diffusionmodules.openaimodel import UNetModel, Timestep
 from comfy.ldm.cascade.stage_c import StageC
@@ -16,6 +16,7 @@ from enum import Enum
 from . import utils
 import comfy.latent_formats
 import math
+
 
 class ModelType(Enum):
     EPS = 1
@@ -144,7 +145,7 @@ class BaseModel(torch.nn.Module):
 
             if denoise_mask is not None:
                 if len(denoise_mask.shape) == len(noise.shape):
-                    denoise_mask = denoise_mask[:,:1]
+                    denoise_mask = denoise_mask[:, :1]
 
                 denoise_mask = denoise_mask.reshape((-1, 1, denoise_mask.shape[-2], denoise_mask.shape[-1]))
                 if denoise_mask.shape[-2:] != noise.shape[-2:]:
@@ -156,30 +157,30 @@ class BaseModel(torch.nn.Module):
                     if ck == "mask":
                         cond_concat.append(denoise_mask.to(device))
                     elif ck == "masked_image":
-                        cond_concat.append(concat_latent_image.to(device)) #NOTE: the latent_image should be masked by the mask in pixel space
+                        cond_concat.append(concat_latent_image.to(device))  # NOTE: the latent_image should be masked by the mask in pixel space
                 else:
                     if ck == "mask":
-                        cond_concat.append(torch.ones_like(noise)[:,:1])
+                        cond_concat.append(torch.ones_like(noise)[:, :1])
                     elif ck == "masked_image":
                         cond_concat.append(self.blank_inpaint_image_like(noise))
             data = torch.cat(cond_concat, dim=1)
-            out['c_concat'] = comfy.conds.CONDNoiseShape(data)
+            out["c_concat"] = comfy.conds.CONDNoiseShape(data)
 
         adm = self.encode_adm(**kwargs)
         if adm is not None:
-            out['y'] = comfy.conds.CONDRegular(adm)
+            out["y"] = comfy.conds.CONDRegular(adm)
 
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
-            out['c_crossattn'] = comfy.conds.CONDCrossAttn(cross_attn)
+            out["c_crossattn"] = comfy.conds.CONDCrossAttn(cross_attn)
 
         cross_attn_cnet = kwargs.get("cross_attn_controlnet", None)
         if cross_attn_cnet is not None:
-            out['crossattn_controlnet'] = comfy.conds.CONDCrossAttn(cross_attn_cnet)
+            out["crossattn_controlnet"] = comfy.conds.CONDCrossAttn(cross_attn_cnet)
 
         c_concat = kwargs.get("noise_concat", None)
         if c_concat is not None:
-            out['c_concat'] = comfy.conds.CONDNoiseShape(c_concat)
+            out["c_concat"] = comfy.conds.CONDNoiseShape(c_concat)
 
         return out
 
@@ -188,7 +189,7 @@ class BaseModel(torch.nn.Module):
         keys = list(sd.keys())
         for k in keys:
             if k.startswith(unet_prefix):
-                to_load[k[len(unet_prefix):]] = sd.pop(k)
+                to_load[k[len(unet_prefix) :]] = sd.pop(k)
 
         to_load = self.model_config.process_unet_state_dict(to_load)
         m, u = self.diffusion_model.load_state_dict(to_load, strict=False)
@@ -228,14 +229,16 @@ class BaseModel(torch.nn.Module):
 
     def set_inpaint(self):
         self.concat_keys = ("mask", "masked_image")
+
         def blank_inpaint_image_like(latent_image):
             blank_image = torch.ones_like(latent_image)
             # these are the values for "zero" in pixel space translated to latent space
-            blank_image[:,0] *= 0.8223
-            blank_image[:,1] *= -0.6876
-            blank_image[:,2] *= 0.6364
-            blank_image[:,3] *= 0.1380
+            blank_image[:, 0] *= 0.8223
+            blank_image[:, 1] *= -0.6876
+            blank_image[:, 2] *= 0.6364
+            blank_image[:, 3] *= 0.1380
             return blank_image
+
         self.blank_inpaint_image_like = blank_inpaint_image_like
 
     def memory_required(self, input_shape):
@@ -243,11 +246,11 @@ class BaseModel(torch.nn.Module):
             dtype = self.get_dtype()
             if self.manual_cast_dtype is not None:
                 dtype = self.manual_cast_dtype
-            #TODO: this needs to be tweaked
+            # TODO: this needs to be tweaked
             area = input_shape[0] * math.prod(input_shape[2:])
             return (area * comfy.model_management.dtype_size(dtype) / 50) * (1024 * 1024)
         else:
-            #TODO: this formula might be too aggressive since I tweaked the sub-quad and split algorithms to use less memory.
+            # TODO: this formula might be too aggressive since I tweaked the sub-quad and split algorithms to use less memory.
             area = input_shape[0] * math.prod(input_shape[2:])
             return (((area * 0.6) / 0.9) + 1024) * (1024 * 1024)
 
@@ -271,10 +274,11 @@ def unclip_adm(unclip_conditioning, device, noise_augmentor, noise_augment_merge
         adm_out = torch.stack(adm_inputs).sum(0)
         noise_augment = noise_augment_merge
         noise_level = round((noise_augmentor.max_noise_level - 1) * noise_augment)
-        c_adm, noise_level_emb = noise_augmentor(adm_out[:, :noise_augmentor.time_embed.dim], noise_level=torch.tensor([noise_level], device=device))
+        c_adm, noise_level_emb = noise_augmentor(adm_out[:, : noise_augmentor.time_embed.dim], noise_level=torch.tensor([noise_level], device=device))
         adm_out = torch.cat((c_adm, noise_level_emb), 1)
 
     return adm_out
+
 
 class SD21UNCLIP(BaseModel):
     def __init__(self, model_config, noise_aug_config, model_type=ModelType.V_PREDICTION, device=None):
@@ -289,17 +293,21 @@ class SD21UNCLIP(BaseModel):
         else:
             return unclip_adm(unclip_conditioning, device, self.noise_augmentor, kwargs.get("unclip_noise_augment_merge", 0.05), kwargs.get("seed", 0) - 10)
 
+
 def sdxl_pooled(args, noise_augmentor):
     if "unclip_conditioning" in args:
-        return unclip_adm(args.get("unclip_conditioning", None), args["device"], noise_augmentor, seed=args.get("seed", 0) - 10)[:,:1280]
+        return unclip_adm(args.get("unclip_conditioning", None), args["device"], noise_augmentor, seed=args.get("seed", 0) - 10)[:, :1280]
     else:
         return args["pooled_output"]
+
 
 class SDXLRefiner(BaseModel):
     def __init__(self, model_config, model_type=ModelType.EPS, device=None):
         super().__init__(model_config, model_type, device=device)
         self.embedder = Timestep(256)
-        self.noise_augmentor = CLIPEmbeddingNoiseAugmentation(**{"noise_schedule_config": {"timesteps": 1000, "beta_schedule": "squaredcos_cap_v2"}, "timestep_dim": 1280})
+        self.noise_augmentor = CLIPEmbeddingNoiseAugmentation(
+            **{"noise_schedule_config": {"timesteps": 1000, "beta_schedule": "squaredcos_cap_v2"}, "timestep_dim": 1280}
+        )
 
     def encode_adm(self, **kwargs):
         clip_pooled = sdxl_pooled(kwargs, self.noise_augmentor)
@@ -322,11 +330,14 @@ class SDXLRefiner(BaseModel):
         flat = torch.flatten(torch.cat(out)).unsqueeze(dim=0).repeat(clip_pooled.shape[0], 1)
         return torch.cat((clip_pooled.to(flat.device), flat), dim=1)
 
+
 class SDXL(BaseModel):
     def __init__(self, model_config, model_type=ModelType.EPS, device=None):
         super().__init__(model_config, model_type, device=device)
         self.embedder = Timestep(256)
-        self.noise_augmentor = CLIPEmbeddingNoiseAugmentation(**{"noise_schedule_config": {"timesteps": 1000, "beta_schedule": "squaredcos_cap_v2"}, "timestep_dim": 1280})
+        self.noise_augmentor = CLIPEmbeddingNoiseAugmentation(
+            **{"noise_schedule_config": {"timesteps": 1000, "beta_schedule": "squaredcos_cap_v2"}, "timestep_dim": 1280}
+        )
 
     def encode_adm(self, **kwargs):
         clip_pooled = sdxl_pooled(kwargs, self.noise_augmentor)
@@ -346,6 +357,7 @@ class SDXL(BaseModel):
         out.append(self.embedder(torch.Tensor([target_width])))
         flat = torch.flatten(torch.cat(out)).unsqueeze(dim=0).repeat(clip_pooled.shape[0], 1)
         return torch.cat((clip_pooled.to(flat.device), flat), dim=1)
+
 
 class SVD_img2vid(BaseModel):
     def __init__(self, model_config, model_type=ModelType.V_PREDICTION_EDM, device=None):
@@ -369,7 +381,7 @@ class SVD_img2vid(BaseModel):
         out = {}
         adm = self.encode_adm(**kwargs)
         if adm is not None:
-            out['y'] = comfy.conds.CONDRegular(adm)
+            out["y"] = comfy.conds.CONDRegular(adm)
 
         latent_image = kwargs.get("concat_latent_image", None)
         noise = kwargs.get("noise", None)
@@ -383,17 +395,18 @@ class SVD_img2vid(BaseModel):
 
         latent_image = utils.resize_to_batch_size(latent_image, noise.shape[0])
 
-        out['c_concat'] = comfy.conds.CONDNoiseShape(latent_image)
+        out["c_concat"] = comfy.conds.CONDNoiseShape(latent_image)
 
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
-            out['c_crossattn'] = comfy.conds.CONDCrossAttn(cross_attn)
+            out["c_crossattn"] = comfy.conds.CONDCrossAttn(cross_attn)
 
         if "time_conditioning" in kwargs:
             out["time_context"] = comfy.conds.CONDCrossAttn(kwargs["time_conditioning"])
 
-        out['num_video_frames'] = comfy.conds.CONDConstant(noise.shape[0])
+        out["num_video_frames"] = comfy.conds.CONDConstant(noise.shape[0])
         return out
+
 
 class SV3D_u(SVD_img2vid):
     def encode_adm(self, **kwargs):
@@ -405,6 +418,7 @@ class SV3D_u(SVD_img2vid):
         flat = torch.flatten(torch.cat(out)).unsqueeze(dim=0)
         return flat
 
+
 class SV3D_p(SVD_img2vid):
     def __init__(self, model_config, model_type=ModelType.V_PREDICTION_EDM, device=None):
         super().__init__(model_config, model_type, device=device)
@@ -412,7 +426,7 @@ class SV3D_p(SVD_img2vid):
 
     def encode_adm(self, **kwargs):
         augmentation = kwargs.get("augmentation_level", 0)
-        elevation = kwargs.get("elevation", 0) #elevation and azimuth are in degrees here
+        elevation = kwargs.get("elevation", 0)  # elevation and azimuth are in degrees here
         azimuth = kwargs.get("azimuth", 0)
         noise = kwargs.get("noise", None)
 
@@ -446,14 +460,15 @@ class Stable_Zero123(BaseModel):
 
         latent_image = utils.resize_to_batch_size(latent_image, noise.shape[0])
 
-        out['c_concat'] = comfy.conds.CONDNoiseShape(latent_image)
+        out["c_concat"] = comfy.conds.CONDNoiseShape(latent_image)
 
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
             if cross_attn.shape[-1] != 768:
                 cross_attn = self.cc_projection(cross_attn)
-            out['c_crossattn'] = comfy.conds.CONDCrossAttn(cross_attn)
+            out["c_crossattn"] = comfy.conds.CONDCrossAttn(cross_attn)
         return out
+
 
 class SD_X4Upscaler(BaseModel):
     def __init__(self, model_config, model_type=ModelType.V_PREDICTION, device=None):
@@ -472,7 +487,7 @@ class SD_X4Upscaler(BaseModel):
         noise_level = round((self.noise_augmentor.max_noise_level) * noise_augment)
 
         if image is None:
-            image = torch.zeros_like(noise)[:,:3]
+            image = torch.zeros_like(noise)[:, :3]
 
         if image.shape[1:] != noise.shape[1:]:
             image = utils.common_upscale(image.to(device), noise.shape[-1], noise.shape[-2], "bilinear", "center")
@@ -483,9 +498,10 @@ class SD_X4Upscaler(BaseModel):
 
         image = utils.resize_to_batch_size(image, noise.shape[0])
 
-        out['c_concat'] = comfy.conds.CONDNoiseShape(image)
-        out['y'] = comfy.conds.CONDRegular(noise_level)
+        out["c_concat"] = comfy.conds.CONDNoiseShape(image)
+        out["y"] = comfy.conds.CONDRegular(noise_level)
         return out
+
 
 class IP2P:
     def extra_conds(self, **kwargs):
@@ -503,24 +519,26 @@ class IP2P:
 
         image = utils.resize_to_batch_size(image, noise.shape[0])
 
-        out['c_concat'] = comfy.conds.CONDNoiseShape(self.process_ip2p_image_in(image))
+        out["c_concat"] = comfy.conds.CONDNoiseShape(self.process_ip2p_image_in(image))
         adm = self.encode_adm(**kwargs)
         if adm is not None:
-            out['y'] = comfy.conds.CONDRegular(adm)
+            out["y"] = comfy.conds.CONDRegular(adm)
         return out
+
 
 class SD15_instructpix2pix(IP2P, BaseModel):
     def __init__(self, model_config, model_type=ModelType.EPS, device=None):
         super().__init__(model_config, model_type, device=device)
         self.process_ip2p_image_in = lambda image: image
 
+
 class SDXL_instructpix2pix(IP2P, SDXL):
     def __init__(self, model_config, model_type=ModelType.EPS, device=None):
         super().__init__(model_config, model_type, device=device)
         if model_type == ModelType.V_PREDICTION_EDM:
-            self.process_ip2p_image_in = lambda image: comfy.latent_formats.SDXL().process_in(image) #cosxl ip2p
+            self.process_ip2p_image_in = lambda image: comfy.latent_formats.SDXL().process_in(image)  # cosxl ip2p
         else:
-            self.process_ip2p_image_in = lambda image: image #diffusers ip2p
+            self.process_ip2p_image_in = lambda image: image  # diffusers ip2p
 
 
 class StableCascade_C(BaseModel):
@@ -532,7 +550,7 @@ class StableCascade_C(BaseModel):
         out = {}
         clip_text_pooled = kwargs["pooled_output"]
         if clip_text_pooled is not None:
-            out['clip_text_pooled'] = comfy.conds.CONDRegular(clip_text_pooled)
+            out["clip_text_pooled"] = comfy.conds.CONDRegular(clip_text_pooled)
 
         if "unclip_conditioning" in kwargs:
             embeds = []
@@ -548,7 +566,7 @@ class StableCascade_C(BaseModel):
 
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
-            out['clip_text'] = comfy.conds.CONDCrossAttn(cross_attn)
+            out["clip_text"] = comfy.conds.CONDCrossAttn(cross_attn)
         return out
 
 
@@ -563,10 +581,13 @@ class StableCascade_B(BaseModel):
 
         clip_text_pooled = kwargs["pooled_output"]
         if clip_text_pooled is not None:
-            out['clip'] = comfy.conds.CONDRegular(clip_text_pooled)
+            out["clip"] = comfy.conds.CONDRegular(clip_text_pooled)
 
-        #size of prior doesn't really matter if zeros because it gets resized but I still want it to get batched
-        prior = kwargs.get("stable_cascade_prior", torch.zeros((1, 16, (noise.shape[2] * 4) // 42, (noise.shape[3] * 4) // 42), dtype=noise.dtype, layout=noise.layout, device=noise.device))
+        # size of prior doesn't really matter if zeros because it gets resized but I still want it to get batched
+        prior = kwargs.get(
+            "stable_cascade_prior",
+            torch.zeros((1, 16, (noise.shape[2] * 4) // 42, (noise.shape[3] * 4) // 42), dtype=noise.dtype, layout=noise.layout, device=noise.device),
+        )
 
         out["effnet"] = comfy.conds.CONDRegular(prior)
         out["sca"] = comfy.conds.CONDRegular(torch.zeros((1,)))
@@ -584,7 +605,7 @@ class SD3(BaseModel):
         out = super().extra_conds(**kwargs)
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
-            out['c_crossattn'] = comfy.conds.CONDRegular(cross_attn)
+            out["c_crossattn"] = comfy.conds.CONDRegular(cross_attn)
         return out
 
     def memory_required(self, input_shape):
@@ -592,12 +613,13 @@ class SD3(BaseModel):
             dtype = self.get_dtype()
             if self.manual_cast_dtype is not None:
                 dtype = self.manual_cast_dtype
-            #TODO: this probably needs to be tweaked
+            # TODO: this probably needs to be tweaked
             area = input_shape[0] * input_shape[2] * input_shape[3]
             return (area * comfy.model_management.dtype_size(dtype) * 0.012) * (1024 * 1024)
         else:
             area = input_shape[0] * input_shape[2] * input_shape[3]
             return (area * 0.3) * (1024 * 1024)
+
 
 class AuraFlow(BaseModel):
     def __init__(self, model_config, model_type=ModelType.FLOW, device=None):
@@ -607,7 +629,7 @@ class AuraFlow(BaseModel):
         out = super().extra_conds(**kwargs)
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
-            out['c_crossattn'] = comfy.conds.CONDRegular(cross_attn)
+            out["c_crossattn"] = comfy.conds.CONDRegular(cross_attn)
         return out
 
 
@@ -632,17 +654,22 @@ class StableAudio1(BaseModel):
         seconds_total_embed = self.seconds_total_embedder([seconds_total])[0].to(device)
 
         global_embed = torch.cat([seconds_start_embed, seconds_total_embed], dim=-1).reshape((1, -1))
-        out['global_embed'] = comfy.conds.CONDRegular(global_embed)
+        out["global_embed"] = comfy.conds.CONDRegular(global_embed)
 
         cross_attn = kwargs.get("cross_attn", None)
         if cross_attn is not None:
-            cross_attn = torch.cat([cross_attn.to(device), seconds_start_embed.repeat((cross_attn.shape[0], 1, 1)), seconds_total_embed.repeat((cross_attn.shape[0], 1, 1))], dim=1)
-            out['c_crossattn'] = comfy.conds.CONDRegular(cross_attn)
+            cross_attn = torch.cat(
+                [cross_attn.to(device), seconds_start_embed.repeat((cross_attn.shape[0], 1, 1)), seconds_total_embed.repeat((cross_attn.shape[0], 1, 1))], dim=1
+            )
+            out["c_crossattn"] = comfy.conds.CONDRegular(cross_attn)
         return out
 
     def state_dict_for_saving(self, clip_state_dict=None, vae_state_dict=None, clip_vision_state_dict=None):
         sd = super().state_dict_for_saving(clip_state_dict=clip_state_dict, vae_state_dict=vae_state_dict, clip_vision_state_dict=clip_vision_state_dict)
-        d = {"conditioner.conditioners.seconds_start.": self.seconds_start_embedder.state_dict(), "conditioner.conditioners.seconds_total.": self.seconds_total_embedder.state_dict()}
+        d = {
+            "conditioner.conditioners.seconds_start.": self.seconds_start_embedder.state_dict(),
+            "conditioner.conditioners.seconds_total.": self.seconds_total_embedder.state_dict(),
+        }
         for k in d:
             s = d[k]
             for l in s:

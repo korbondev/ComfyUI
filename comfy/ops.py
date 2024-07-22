@@ -16,8 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import torch
+import oneflow as torch
 import comfy.model_management
+
 
 def cast_bias_weight(s, input):
     bias = None
@@ -31,10 +32,12 @@ def cast_bias_weight(s, input):
         weight = s.weight_function(weight)
     return weight, bias
 
+
 class CastWeightBiasOp:
     comfy_cast_weights = False
     weight_function = None
     bias_function = None
+
 
 class disable_weight_init:
     class Linear(torch.nn.Linear, CastWeightBiasOp):
@@ -107,7 +110,6 @@ class disable_weight_init:
             else:
                 return super().forward(*args, **kwargs)
 
-
     class LayerNorm(torch.nn.LayerNorm, CastWeightBiasOp):
         def reset_parameters(self):
             return None
@@ -132,14 +134,10 @@ class disable_weight_init:
 
         def forward_comfy_cast_weights(self, input, output_size=None):
             num_spatial_dims = 2
-            output_padding = self._output_padding(
-                input, output_size, self.stride, self.padding, self.kernel_size,
-                num_spatial_dims, self.dilation)
+            output_padding = self._output_padding(input, output_size, self.stride, self.padding, self.kernel_size, num_spatial_dims, self.dilation)
 
             weight, bias = cast_bias_weight(self, input)
-            return torch.nn.functional.conv_transpose2d(
-                input, weight, bias, self.stride, self.padding,
-                output_padding, self.groups, self.dilation)
+            return torch.nn.functional.conv_transpose2d(input, weight, bias, self.stride, self.padding, output_padding, self.groups, self.dilation)
 
         def forward(self, *args, **kwargs):
             if self.comfy_cast_weights:
@@ -153,14 +151,10 @@ class disable_weight_init:
 
         def forward_comfy_cast_weights(self, input, output_size=None):
             num_spatial_dims = 1
-            output_padding = self._output_padding(
-                input, output_size, self.stride, self.padding, self.kernel_size,
-                num_spatial_dims, self.dilation)
+            output_padding = self._output_padding(input, output_size, self.stride, self.padding, self.kernel_size, num_spatial_dims, self.dilation)
 
             weight, bias = cast_bias_weight(self, input)
-            return torch.nn.functional.conv_transpose1d(
-                input, weight, bias, self.stride, self.padding,
-                output_padding, self.groups, self.dilation)
+            return torch.nn.functional.conv_transpose1d(input, weight, bias, self.stride, self.padding, output_padding, self.groups, self.dilation)
 
         def forward(self, *args, **kwargs):
             if self.comfy_cast_weights:

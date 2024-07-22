@@ -1,27 +1,33 @@
-import torch
+import oneflow as torch
 import comfy.model_management
 import comfy.sampler_helpers
 import comfy.samplers
 import comfy.utils
 import node_helpers
 
+
 def perp_neg(x, noise_pred_pos, noise_pred_neg, noise_pred_nocond, neg_scale, cond_scale):
     pos = noise_pred_pos - noise_pred_nocond
     neg = noise_pred_neg - noise_pred_nocond
 
-    perp = neg - ((torch.mul(neg, pos).sum())/(torch.norm(pos)**2)) * pos
+    perp = neg - ((torch.mul(neg, pos).sum()) / (torch.norm(pos) ** 2)) * pos
     perp_neg = perp * neg_scale
-    cfg_result = noise_pred_nocond + cond_scale*(pos - perp_neg)
+    cfg_result = noise_pred_nocond + cond_scale * (pos - perp_neg)
     return cfg_result
 
-#TODO: This node should be removed, it has been replaced with PerpNegGuider
+
+# TODO: This node should be removed, it has been replaced with PerpNegGuider
 class PerpNeg:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {"model": ("MODEL", ),
-                             "empty_conditioning": ("CONDITIONING", ),
-                             "neg_scale": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step": 0.01}),
-                            }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "empty_conditioning": ("CONDITIONING",),
+                "neg_scale": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+            }
+        }
+
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
 
@@ -48,7 +54,7 @@ class PerpNeg:
 
         m.set_model_sampler_cfg_function(cfg_function)
 
-        return (m, )
+        return (m,)
 
 
 class Guider_PerpNeg(comfy.samplers.CFGGuider):
@@ -63,16 +69,17 @@ class Guider_PerpNeg(comfy.samplers.CFGGuider):
     def predict_noise(self, x, timestep, model_options={}, seed=None):
         # in CFGGuider.predict_noise, we call sampling_function(), which uses cfg_function() to compute pos & neg
         # but we'd rather do a single batch of sampling pos, neg, and empty, so we call calc_cond_batch([pos,neg,empty]) directly
-        
+
         positive_cond = self.conds.get("positive", None)
         negative_cond = self.conds.get("negative", None)
         empty_cond = self.conds.get("empty_negative_prompt", None)
 
-        (noise_pred_pos, noise_pred_neg, noise_pred_empty) = \
-            comfy.samplers.calc_cond_batch(self.inner_model, [positive_cond, negative_cond, empty_cond], x, timestep, model_options)
+        (noise_pred_pos, noise_pred_neg, noise_pred_empty) = comfy.samplers.calc_cond_batch(
+            self.inner_model, [positive_cond, negative_cond, empty_cond], x, timestep, model_options
+        )
         cfg_result = perp_neg(x, noise_pred_pos, noise_pred_neg, noise_pred_empty, self.neg_scale, self.cfg)
 
-        # normally this would be done in cfg_function, but we skipped 
+        # normally this would be done in cfg_function, but we skipped
         # that for efficiency: we can compute the noise predictions in
         # a single call to calc_cond_batch() (rather than two)
         # so we replicate the hook here
@@ -89,23 +96,26 @@ class Guider_PerpNeg(comfy.samplers.CFGGuider):
                 "input": x,
                 # not in the original call in samplers.py:cfg_function, but made available for future hooks
                 "empty_cond": empty_cond,
-                "empty_cond_denoised": noise_pred_empty,}
+                "empty_cond_denoised": noise_pred_empty,
+            }
             cfg_result = fn(args)
 
         return cfg_result
 
+
 class PerpNegGuider:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required":
-                    {"model": ("MODEL",),
-                    "positive": ("CONDITIONING", ),
-                    "negative": ("CONDITIONING", ),
-                    "empty_conditioning": ("CONDITIONING", ),
-                    "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step":0.1, "round": 0.01}),
-                    "neg_scale": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step": 0.01}),
-                     }
-                }
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "positive": ("CONDITIONING",),
+                "negative": ("CONDITIONING",),
+                "empty_conditioning": ("CONDITIONING",),
+                "cfg": ("FLOAT", {"default": 8.0, "min": 0.0, "max": 100.0, "step": 0.1, "round": 0.01}),
+                "neg_scale": ("FLOAT", {"default": 1.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+            }
+        }
 
     RETURN_TYPES = ("GUIDER",)
 
@@ -117,6 +127,7 @@ class PerpNegGuider:
         guider.set_conds(positive, negative, empty_conditioning)
         guider.set_cfg(cfg, neg_scale)
         return (guider,)
+
 
 NODE_CLASS_MAPPINGS = {
     "PerpNeg": PerpNeg,

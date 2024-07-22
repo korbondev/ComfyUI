@@ -1,9 +1,9 @@
-#taken from: https://github.com/lllyasviel/ControlNet
-#and modified
+# taken from: https://github.com/lllyasviel/ControlNet
+# and modified
 
-import torch
-import torch as th
-import torch.nn as nn
+import oneflow as torch
+import oneflow as th
+import oneflow.nn as nn
 
 from ..ldm.modules.diffusionmodules.util import (
     zero_module,
@@ -16,6 +16,7 @@ from ..ldm.util import exists
 from collections import OrderedDict
 import comfy.ops
 from comfy.ldm.modules.attention import optimized_attention
+
 
 class OptimizedAttention(nn.Module):
     def __init__(self, c, nhead, dropout=0.0, dtype=None, device=None, operations=None):
@@ -32,9 +33,11 @@ class OptimizedAttention(nn.Module):
         out = optimized_attention(q, k, v, self.heads)
         return self.out_proj(out)
 
+
 class QuickGELU(nn.Module):
     def forward(self, x: torch.Tensor):
         return x * torch.sigmoid(1.702 * x)
+
 
 class ResBlockUnionControlnet(nn.Module):
     def __init__(self, dim, nhead, dtype=None, device=None, operations=None):
@@ -42,8 +45,14 @@ class ResBlockUnionControlnet(nn.Module):
         self.attn = OptimizedAttention(dim, nhead, dtype=dtype, device=device, operations=operations)
         self.ln_1 = operations.LayerNorm(dim, dtype=dtype, device=device)
         self.mlp = nn.Sequential(
-            OrderedDict([("c_fc", operations.Linear(dim, dim * 4, dtype=dtype, device=device)), ("gelu", QuickGELU()),
-                         ("c_proj", operations.Linear(dim * 4, dim, dtype=dtype, device=device))]))
+            OrderedDict(
+                [
+                    ("c_fc", operations.Linear(dim, dim * 4, dtype=dtype, device=device)),
+                    ("gelu", QuickGELU()),
+                    ("c_proj", operations.Linear(dim * 4, dim, dtype=dtype, device=device)),
+                ]
+            )
+        )
         self.ln_2 = operations.LayerNorm(dim, dtype=dtype, device=device)
 
     def attention(self, x: torch.Tensor):
@@ -54,9 +63,11 @@ class ResBlockUnionControlnet(nn.Module):
         x = x + self.mlp(self.ln_2(x))
         return x
 
+
 class ControlledUnetModel(UNetModel):
-    #implemented in the ldm unet
+    # implemented in the ldm unet
     pass
+
 
 class ControlNet(nn.Module):
     def __init__(
@@ -79,10 +90,10 @@ class ControlNet(nn.Module):
         use_scale_shift_norm=False,
         resblock_updown=False,
         use_new_attention_order=False,
-        use_spatial_transformer=False,    # custom transformer support
-        transformer_depth=1,              # custom transformer support
-        context_dim=None,                 # custom transformer support
-        n_embed=None,                     # custom support for prediction of discrete ids into codebook of first stage vq model
+        use_spatial_transformer=False,  # custom transformer support
+        transformer_depth=1,  # custom transformer support
+        context_dim=None,  # custom transformer support
+        n_embed=None,  # custom support for prediction of discrete ids into codebook of first stage vq model
         legacy=True,
         disable_self_attentions=None,
         num_attention_blocks=None,
@@ -100,10 +111,10 @@ class ControlNet(nn.Module):
         super().__init__()
         assert use_spatial_transformer == True, "use_spatial_transformer has to be true"
         if use_spatial_transformer:
-            assert context_dim is not None, 'Fool!! You forgot to include the dimension of your cross-attention conditioning...'
+            assert context_dim is not None, "Fool!! You forgot to include the dimension of your cross-attention conditioning..."
 
         if context_dim is not None:
-            assert use_spatial_transformer, 'Fool!! You forgot to use the spatial transformer for your cross-attention conditioning...'
+            assert use_spatial_transformer, "Fool!! You forgot to use the spatial transformer for your cross-attention conditioning..."
             # from omegaconf.listconfig import ListConfig
             # if type(context_dim) == ListConfig:
             #     context_dim = list(context_dim)
@@ -112,10 +123,10 @@ class ControlNet(nn.Module):
             num_heads_upsample = num_heads
 
         if num_heads == -1:
-            assert num_head_channels != -1, 'Either num_heads or num_head_channels has to be set'
+            assert num_head_channels != -1, "Either num_heads or num_head_channels has to be set"
 
         if num_head_channels == -1:
-            assert num_heads != -1, 'Either num_heads or num_head_channels has to be set'
+            assert num_heads != -1, "Either num_heads or num_head_channels has to be set"
 
         self.dims = dims
         self.image_size = image_size
@@ -126,8 +137,7 @@ class ControlNet(nn.Module):
             self.num_res_blocks = len(channel_mult) * [num_res_blocks]
         else:
             if len(num_res_blocks) != len(channel_mult):
-                raise ValueError("provide num_res_blocks either as an int (globally constant) or "
-                                 "as a list/tuple (per-level) with the same length as channel_mult")
+                raise ValueError("provide num_res_blocks either as an int (globally constant) or " "as a list/tuple (per-level) with the same length as channel_mult")
             self.num_res_blocks = num_res_blocks
 
         if disable_self_attentions is not None:
@@ -176,30 +186,26 @@ class ControlNet(nn.Module):
                 raise ValueError()
 
         self.input_blocks = nn.ModuleList(
-            [
-                TimestepEmbedSequential(
-                    operations.conv_nd(dims, in_channels, model_channels, 3, padding=1, dtype=self.dtype, device=device)
-                )
-            ]
+            [TimestepEmbedSequential(operations.conv_nd(dims, in_channels, model_channels, 3, padding=1, dtype=self.dtype, device=device))]
         )
         self.zero_convs = nn.ModuleList([self.make_zero_conv(model_channels, operations=operations, dtype=self.dtype, device=device)])
 
         self.input_hint_block = TimestepEmbedSequential(
-                    operations.conv_nd(dims, hint_channels, 16, 3, padding=1, dtype=self.dtype, device=device),
-                    nn.SiLU(),
-                    operations.conv_nd(dims, 16, 16, 3, padding=1, dtype=self.dtype, device=device),
-                    nn.SiLU(),
-                    operations.conv_nd(dims, 16, 32, 3, padding=1, stride=2, dtype=self.dtype, device=device),
-                    nn.SiLU(),
-                    operations.conv_nd(dims, 32, 32, 3, padding=1, dtype=self.dtype, device=device),
-                    nn.SiLU(),
-                    operations.conv_nd(dims, 32, 96, 3, padding=1, stride=2, dtype=self.dtype, device=device),
-                    nn.SiLU(),
-                    operations.conv_nd(dims, 96, 96, 3, padding=1, dtype=self.dtype, device=device),
-                    nn.SiLU(),
-                    operations.conv_nd(dims, 96, 256, 3, padding=1, stride=2, dtype=self.dtype, device=device),
-                    nn.SiLU(),
-                    operations.conv_nd(dims, 256, model_channels, 3, padding=1, dtype=self.dtype, device=device)
+            operations.conv_nd(dims, hint_channels, 16, 3, padding=1, dtype=self.dtype, device=device),
+            nn.SiLU(),
+            operations.conv_nd(dims, 16, 16, 3, padding=1, dtype=self.dtype, device=device),
+            nn.SiLU(),
+            operations.conv_nd(dims, 16, 32, 3, padding=1, stride=2, dtype=self.dtype, device=device),
+            nn.SiLU(),
+            operations.conv_nd(dims, 32, 32, 3, padding=1, dtype=self.dtype, device=device),
+            nn.SiLU(),
+            operations.conv_nd(dims, 32, 96, 3, padding=1, stride=2, dtype=self.dtype, device=device),
+            nn.SiLU(),
+            operations.conv_nd(dims, 96, 96, 3, padding=1, dtype=self.dtype, device=device),
+            nn.SiLU(),
+            operations.conv_nd(dims, 96, 256, 3, padding=1, stride=2, dtype=self.dtype, device=device),
+            nn.SiLU(),
+            operations.conv_nd(dims, 256, model_channels, 3, padding=1, dtype=self.dtype, device=device),
         )
 
         self._feature_size = model_channels
@@ -231,7 +237,7 @@ class ControlNet(nn.Module):
                         num_heads = ch // num_head_channels
                         dim_head = num_head_channels
                     if legacy:
-                        #num_heads = 1
+                        # num_heads = 1
                         dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
                     if exists(disable_self_attentions):
                         disabled_sa = disable_self_attentions[level]
@@ -241,9 +247,18 @@ class ControlNet(nn.Module):
                     if not exists(num_attention_blocks) or nr < num_attention_blocks[level]:
                         layers.append(
                             SpatialTransformer(
-                                ch, num_heads, dim_head, depth=num_transformers, context_dim=context_dim,
-                                disable_self_attn=disabled_sa, use_linear=use_linear_in_transformer,
-                                use_checkpoint=use_checkpoint, attn_precision=attn_precision, dtype=self.dtype, device=device, operations=operations
+                                ch,
+                                num_heads,
+                                dim_head,
+                                depth=num_transformers,
+                                context_dim=context_dim,
+                                disable_self_attn=disabled_sa,
+                                use_linear=use_linear_in_transformer,
+                                use_checkpoint=use_checkpoint,
+                                attn_precision=attn_precision,
+                                dtype=self.dtype,
+                                device=device,
+                                operations=operations,
                             )
                         )
                 self.input_blocks.append(TimestepEmbedSequential(*layers))
@@ -265,12 +280,10 @@ class ControlNet(nn.Module):
                             down=True,
                             dtype=self.dtype,
                             device=device,
-                            operations=operations
+                            operations=operations,
                         )
                         if resblock_updown
-                        else Downsample(
-                            ch, conv_resample, dims=dims, out_channels=out_ch, dtype=self.dtype, device=device, operations=operations
-                        )
+                        else Downsample(ch, conv_resample, dims=dims, out_channels=out_ch, dtype=self.dtype, device=device, operations=operations)
                     )
                 )
                 ch = out_ch
@@ -285,7 +298,7 @@ class ControlNet(nn.Module):
             num_heads = ch // num_head_channels
             dim_head = num_head_channels
         if legacy:
-            #num_heads = 1
+            # num_heads = 1
             dim_head = ch // num_heads if use_spatial_transformer else num_head_channels
         mid_block = [
             ResBlock(
@@ -297,25 +310,37 @@ class ControlNet(nn.Module):
                 use_scale_shift_norm=use_scale_shift_norm,
                 dtype=self.dtype,
                 device=device,
-                operations=operations
-            )]
+                operations=operations,
+            )
+        ]
         if transformer_depth_middle >= 0:
-            mid_block += [SpatialTransformer(  # always uses a self-attn
-                            ch, num_heads, dim_head, depth=transformer_depth_middle, context_dim=context_dim,
-                            disable_self_attn=disable_middle_self_attn, use_linear=use_linear_in_transformer,
-                            use_checkpoint=use_checkpoint, attn_precision=attn_precision, dtype=self.dtype, device=device, operations=operations
-                        ),
-            ResBlock(
-                ch,
-                time_embed_dim,
-                dropout,
-                dims=dims,
-                use_checkpoint=use_checkpoint,
-                use_scale_shift_norm=use_scale_shift_norm,
-                dtype=self.dtype,
-                device=device,
-                operations=operations
-            )]
+            mid_block += [
+                SpatialTransformer(  # always uses a self-attn
+                    ch,
+                    num_heads,
+                    dim_head,
+                    depth=transformer_depth_middle,
+                    context_dim=context_dim,
+                    disable_self_attn=disable_middle_self_attn,
+                    use_linear=use_linear_in_transformer,
+                    use_checkpoint=use_checkpoint,
+                    attn_precision=attn_precision,
+                    dtype=self.dtype,
+                    device=device,
+                    operations=operations,
+                ),
+                ResBlock(
+                    ch,
+                    time_embed_dim,
+                    dropout,
+                    dims=dims,
+                    use_checkpoint=use_checkpoint,
+                    use_scale_shift_norm=use_scale_shift_norm,
+                    dtype=self.dtype,
+                    device=device,
+                    operations=operations,
+                ),
+            ]
         self.middle_block = TimestepEmbedSequential(*mid_block)
         self.middle_block_out = self.make_zero_conv(ch, operations=operations, dtype=self.dtype, device=device)
         self._feature_size += ch
@@ -329,11 +354,14 @@ class ControlNet(nn.Module):
             # task_scale_factor = num_trans_channel ** 0.5
             self.task_embedding = nn.Parameter(torch.empty(self.num_control_type, num_trans_channel, dtype=self.dtype, device=device))
 
-            self.transformer_layes = nn.Sequential(*[ResBlockUnionControlnet(num_trans_channel, num_trans_head, dtype=self.dtype, device=device, operations=operations) for _ in range(num_trans_layer)])
+            self.transformer_layes = nn.Sequential(
+                *[ResBlockUnionControlnet(num_trans_channel, num_trans_head, dtype=self.dtype, device=device, operations=operations) for _ in range(num_trans_layer)]
+            )
             self.spatial_ch_projs = operations.Linear(num_trans_channel, num_proj_channel, dtype=self.dtype, device=device)
-            #-----------------------------------------------------------------------------------------------------
+            # -----------------------------------------------------------------------------------------------------
 
             control_add_embed_dim = 256
+
             class ControlAddEmbedding(nn.Module):
                 def __init__(self, in_dim, out_dim, num_control_type, dtype=None, device=None, operations=None):
                     super().__init__()
@@ -341,13 +369,16 @@ class ControlNet(nn.Module):
                     self.in_dim = in_dim
                     self.linear_1 = operations.Linear(in_dim * num_control_type, out_dim, dtype=dtype, device=device)
                     self.linear_2 = operations.Linear(out_dim, out_dim, dtype=dtype, device=device)
+
                 def forward(self, control_type, dtype, device):
                     c_type = torch.zeros((self.num_control_type,), device=device)
                     c_type[control_type] = 1.0
                     c_type = timestep_embedding(c_type.flatten(), self.in_dim, repeat_only=False).to(dtype).reshape((-1, self.num_control_type * self.in_dim))
                     return self.linear_2(torch.nn.functional.silu(self.linear_1(c_type)))
 
-            self.control_add_embedding = ControlAddEmbedding(control_add_embed_dim, time_embed_dim, self.num_control_type, dtype=self.dtype, device=device, operations=operations)
+            self.control_add_embedding = ControlAddEmbedding(
+                control_add_embed_dim, time_embed_dim, self.num_control_type, dtype=self.dtype, device=device, operations=operations
+            )
         else:
             self.task_embedding = None
             self.control_add_embedding = None
@@ -387,7 +418,7 @@ class ControlNet(nn.Module):
         emb = self.time_embed(t_emb)
 
         guided_hint = None
-        if self.control_add_embedding is not None: #Union Controlnet
+        if self.control_add_embedding is not None:  # Union Controlnet
             control_type = kwargs.get("control_type", [])
 
             emb += self.control_add_embedding(control_type, emb.dtype, emb.device)
@@ -421,4 +452,3 @@ class ControlNet(nn.Module):
         out_middle.append(self.middle_block_out(h, emb, context))
 
         return {"middle": out_middle, "output": out_output}
-

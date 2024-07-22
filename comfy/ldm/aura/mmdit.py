@@ -1,13 +1,14 @@
-#AuraFlow MMDiT
-#Originally written by the AuraFlow Authors
+# AuraFlow MMDiT
+# Originally written by the AuraFlow Authors
 
 import math
 
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
+import oneflow as torch
+import oneflow.nn as nn
+import oneflow.nn.functional as F
 
 from comfy.ldm.modules.attention import optimized_attention
+
 
 def modulate(x, shift, scale):
     return x * (1 + scale.unsqueeze(1)) + shift.unsqueeze(1)
@@ -51,11 +52,10 @@ class MultiHeadLayerNorm(nn.Module):
         hidden_states = hidden_states.to(torch.float32)
         mean = hidden_states.mean(-1, keepdim=True)
         variance = (hidden_states - mean).pow(2).mean(-1, keepdim=True)
-        hidden_states = (hidden_states - mean) * torch.rsqrt(
-            variance + self.variance_epsilon
-        )
+        hidden_states = (hidden_states - mean) * torch.rsqrt(variance + self.variance_epsilon)
         hidden_states = self.weight.to(torch.float32) * hidden_states
         return hidden_states.to(input_dtype)
+
 
 class SingleAttention(nn.Module):
     def __init__(self, dim, n_heads, mh_qknorm=False, dtype=None, device=None, operations=None):
@@ -81,7 +81,7 @@ class SingleAttention(nn.Module):
             else operations.LayerNorm(self.head_dim, elementwise_affine=False, dtype=dtype, device=device)
         )
 
-    #@torch.compile()
+    # @torch.compile()
     def forward(self, c):
 
         bsz, seqlen1, _ = c.shape
@@ -95,7 +95,6 @@ class SingleAttention(nn.Module):
         output = optimized_attention(q.permute(0, 2, 1, 3), k.permute(0, 2, 1, 3), v.permute(0, 2, 1, 3), self.n_heads, skip_reshape=True)
         c = self.w1o(output)
         return c
-
 
 
 class DoubleAttention(nn.Module):
@@ -139,8 +138,7 @@ class DoubleAttention(nn.Module):
             else operations.LayerNorm(self.head_dim, elementwise_affine=False, dtype=dtype, device=device)
         )
 
-
-    #@torch.compile()
+    # @torch.compile()
     def forward(self, c, x):
 
         bsz, seqlen1, _ = c.shape
@@ -204,27 +202,22 @@ class MMDiTBlock(nn.Module):
         self.attn = DoubleAttention(dim, heads, dtype=dtype, device=device, operations=operations)
         self.is_last = is_last
 
-    #@torch.compile()
+    # @torch.compile()
     def forward(self, c, x, global_cond, **kwargs):
 
         cres, xres = c, x
 
-        cshift_msa, cscale_msa, cgate_msa, cshift_mlp, cscale_mlp, cgate_mlp = (
-            self.modC(global_cond).chunk(6, dim=1)
-        )
+        cshift_msa, cscale_msa, cgate_msa, cshift_mlp, cscale_mlp, cgate_mlp = self.modC(global_cond).chunk(6, dim=1)
 
         c = modulate(self.normC1(c), cshift_msa, cscale_msa)
 
         # xpath
-        xshift_msa, xscale_msa, xgate_msa, xshift_mlp, xscale_mlp, xgate_mlp = (
-            self.modX(global_cond).chunk(6, dim=1)
-        )
+        xshift_msa, xscale_msa, xgate_msa, xshift_mlp, xscale_mlp, xgate_mlp = self.modX(global_cond).chunk(6, dim=1)
 
         x = modulate(self.normX1(x), xshift_msa, xscale_msa)
 
         # attention
         c, x = self.attn(c, x)
-
 
         c = self.normC2(cres + cgate_msa.unsqueeze(1) * c)
         c = cgate_mlp.unsqueeze(1) * self.mlpC(modulate(c, cshift_mlp, cscale_mlp))
@@ -235,6 +228,7 @@ class MMDiTBlock(nn.Module):
         x = xres + x
 
         return c, x
+
 
 class DiTBlock(nn.Module):
     # like MMDiTBlock, but it only has X
@@ -252,12 +246,10 @@ class DiTBlock(nn.Module):
         self.attn = SingleAttention(dim, heads, dtype=dtype, device=device, operations=operations)
         self.mlp = MLP(dim, hidden_dim=dim * 4, dtype=dtype, device=device, operations=operations)
 
-    #@torch.compile()
+    # @torch.compile()
     def forward(self, cx, global_cond, **kwargs):
         cxres = cx
-        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.modCX(
-            global_cond
-        ).chunk(6, dim=1)
+        shift_msa, scale_msa, gate_msa, shift_mlp, scale_mlp, gate_mlp = self.modCX(global_cond).chunk(6, dim=1)
         cx = modulate(self.norm1(cx), shift_msa, scale_msa)
         cx = self.attn(cx)
         cx = self.norm2(cxres + gate_msa.unsqueeze(1) * cx)
@@ -267,7 +259,6 @@ class DiTBlock(nn.Module):
         cx = cxres + cx
 
         return cx
-
 
 
 class TimestepEmbedder(nn.Module):
@@ -283,18 +274,14 @@ class TimestepEmbedder(nn.Module):
     @staticmethod
     def timestep_embedding(t, dim, max_period=10000):
         half = dim // 2
-        freqs = 1000 * torch.exp(
-            -math.log(max_period) * torch.arange(start=0, end=half) / half
-        ).to(t.device)
+        freqs = 1000 * torch.exp(-math.log(max_period) * torch.arange(start=0, end=half) / half).to(t.device)
         args = t[:, None] * freqs[None]
         embedding = torch.cat([torch.cos(args), torch.sin(args)], dim=-1)
         if dim % 2:
-            embedding = torch.cat(
-                [embedding, torch.zeros_like(embedding[:, :1])], dim=-1
-            )
+            embedding = torch.cat([embedding, torch.zeros_like(embedding[:, :1])], dim=-1)
         return embedding
 
-    #@torch.compile()
+    # @torch.compile()
     def forward(self, t, dtype):
         t_freq = self.timestep_embedding(t, self.frequency_embedding_size).to(dtype)
         t_emb = self.mlp(t_freq)
@@ -323,12 +310,8 @@ class MMDiT(nn.Module):
 
         self.t_embedder = TimestepEmbedder(global_conddim, dtype=dtype, device=device, operations=operations)
 
-        self.cond_seq_linear = operations.Linear(
-            cond_seq_dim, dim, bias=False, dtype=dtype, device=device
-        )  # linear for something like text sequence.
-        self.init_x_linear = operations.Linear(
-            patch_size * patch_size * in_channels, dim, dtype=dtype, device=device
-        )  # init linear for patchified image.
+        self.cond_seq_linear = operations.Linear(cond_seq_dim, dim, bias=False, dtype=dtype, device=device)  # linear for something like text sequence.
+        self.init_x_linear = operations.Linear(patch_size * patch_size * in_channels, dim, dtype=dtype, device=device)  # init linear for patchified image.
 
         self.positional_encoding = nn.Parameter(torch.empty(1, max_seq, dim, dtype=dtype, device=device))
         self.register_tokens = nn.Parameter(torch.empty(1, 8, dim, dtype=dtype, device=device))
@@ -336,21 +319,13 @@ class MMDiT(nn.Module):
         self.double_layers = nn.ModuleList([])
         self.single_layers = nn.ModuleList([])
 
-
         for idx in range(n_double_layers):
-            self.double_layers.append(
-                MMDiTBlock(dim, n_heads, global_conddim, is_last=(idx == n_layers - 1), dtype=dtype, device=device, operations=operations)
-            )
+            self.double_layers.append(MMDiTBlock(dim, n_heads, global_conddim, is_last=(idx == n_layers - 1), dtype=dtype, device=device, operations=operations))
 
         for idx in range(n_double_layers, n_layers):
-            self.single_layers.append(
-                DiTBlock(dim, n_heads, global_conddim, dtype=dtype, device=device, operations=operations)
-            )
+            self.single_layers.append(DiTBlock(dim, n_heads, global_conddim, dtype=dtype, device=device, operations=operations))
 
-
-        self.final_linear = operations.Linear(
-            dim, patch_size * patch_size * out_channels, bias=False, dtype=dtype, device=device
-        )
+        self.final_linear = operations.Linear(dim, patch_size * patch_size * out_channels, bias=False, dtype=dtype, device=device)
 
         self.modF = nn.Sequential(
             nn.SiLU(),
@@ -374,9 +349,7 @@ class MMDiT(nn.Module):
 
         # now we need to extend this to target_dim. for this we will use interpolation.
         # we will use torch.nn.functional.interpolate
-        pe_as_2d = F.interpolate(
-            pe_as_2d.unsqueeze(0), size=target_dim, mode="bilinear"
-        )
+        pe_as_2d = F.interpolate(pe_as_2d.unsqueeze(0), size=target_dim, mode="bilinear")
         pe_new = pe_as_2d.squeeze(0).permute(1, 2, 0).flatten(0, 1)
         self.positional_encoding.data = pe_new.unsqueeze(0).contiguous()
         self.h_max, self.w_max = target_dim
@@ -386,13 +359,11 @@ class MMDiT(nn.Module):
         h_p, w_p = h // self.patch_size, w // self.patch_size
         original_pe_indexes = torch.arange(self.positional_encoding.shape[1])
         original_pe_indexes = original_pe_indexes.view(self.h_max, self.w_max)
-        starth =  self.h_max // 2 - h_p // 2
-        endh =starth + h_p
+        starth = self.h_max // 2 - h_p // 2
+        endh = starth + h_p
         startw = self.w_max // 2 - w_p // 2
         endw = startw + w_p
-        original_pe_indexes = original_pe_indexes[
-            starth:endh, startw:endw
-        ]
+        original_pe_indexes = original_pe_indexes[starth:endh, startw:endw]
         return original_pe_indexes.flatten()
 
     def unpatchify(self, x, h, w):
@@ -409,7 +380,7 @@ class MMDiT(nn.Module):
         pad_h = (self.patch_size - H % self.patch_size) % self.patch_size
         pad_w = (self.patch_size - W % self.patch_size) % self.patch_size
 
-        x = torch.nn.functional.pad(x, (0, pad_w, 0, pad_h), mode='reflect')
+        x = torch.nn.functional.pad(x, (0, pad_w, 0, pad_h), mode="reflect")
         x = x.view(
             B,
             C,
@@ -435,7 +406,7 @@ class MMDiT(nn.Module):
 
         from_h = (cur_dim - h) // 2
         from_w = (cur_dim - w) // 2
-        pos_encoding = pos_encoding[:,from_h:from_h+h,from_w:from_w+w]
+        pos_encoding = pos_encoding[:, from_h : from_h + h, from_w : from_w + w]
         return x + pos_encoding.reshape(1, -1, self.positional_encoding.shape[-1])
 
     def forward(self, x, timestep, context, **kwargs):
@@ -475,5 +446,5 @@ class MMDiT(nn.Module):
 
         x = modulate(x, fshift, fscale)
         x = self.final_linear(x)
-        x = self.unpatchify(x, (h + 1) // self.patch_size, (w + 1) // self.patch_size)[:,:,:h,:w]
+        x = self.unpatchify(x, (h + 1) // self.patch_size, (w + 1) // self.patch_size)[:, :, :h, :w]
         return x
