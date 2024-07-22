@@ -1,4 +1,4 @@
-import torch
+import oneflow
 import torch.nn as nn
 import folder_paths
 import comfy.clip_model
@@ -17,6 +17,7 @@ VISION_CONFIG_DICT = {
     "projection_dim": 768,
     "hidden_act": "quick_gelu",
 }
+
 
 class MLP(nn.Module):
     def __init__(self, in_dim, out_dim, hidden_dim, use_residual=True, operations=comfy.ops):
@@ -62,19 +63,14 @@ class FuseModule(nn.Module):
     ) -> torch.Tensor:
         # id_embeds shape: [b, max_num_inputs, 1, 2048]
         id_embeds = id_embeds.to(prompt_embeds.dtype)
-        num_inputs = class_tokens_mask.sum().unsqueeze(0) # TODO: check for training case
+        num_inputs = class_tokens_mask.sum().unsqueeze(0)  # TODO: check for training case
         batch_size, max_num_inputs = id_embeds.shape[:2]
         # seq_length: 77
         seq_length = prompt_embeds.shape[1]
         # flat_id_embeds shape: [b*max_num_inputs, 1, 2048]
-        flat_id_embeds = id_embeds.view(
-            -1, id_embeds.shape[-2], id_embeds.shape[-1]
-        )
+        flat_id_embeds = id_embeds.view(-1, id_embeds.shape[-2], id_embeds.shape[-1])
         # valid_id_mask [b*max_num_inputs]
-        valid_id_mask = (
-            torch.arange(max_num_inputs, device=flat_id_embeds.device)[None, :]
-            < num_inputs[:, None]
-        )
+        valid_id_mask = torch.arange(max_num_inputs, device=flat_id_embeds.device)[None, :] < num_inputs[:, None]
         valid_id_embeds = flat_id_embeds[valid_id_mask.flatten()]
 
         prompt_embeds = prompt_embeds.view(-1, prompt_embeds.shape[-1])
@@ -87,6 +83,7 @@ class FuseModule(nn.Module):
         prompt_embeds.masked_scatter_(class_tokens_mask[:, None], stacked_id_embeds.to(prompt_embeds.dtype))
         updated_prompt_embeds = prompt_embeds.view(batch_size, seq_length, -1)
         return updated_prompt_embeds
+
 
 class PhotoMakerIDEncoder(comfy.clip_model.CLIPVisionModelProjection):
     def __init__(self):
@@ -118,7 +115,7 @@ class PhotoMakerIDEncoder(comfy.clip_model.CLIPVisionModelProjection):
 class PhotoMakerLoader:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "photomaker_model_name": (folder_paths.get_filename_list("photomaker"), )}}
+        return {"required": {"photomaker_model_name": (folder_paths.get_filename_list("photomaker"),)}}
 
     RETURN_TYPES = ("PHOTOMAKER",)
     FUNCTION = "load_photomaker_model"
@@ -138,11 +135,14 @@ class PhotoMakerLoader:
 class PhotoMakerEncode:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "photomaker": ("PHOTOMAKER",),
-                              "image": ("IMAGE",),
-                              "clip": ("CLIP", ),
-                              "text": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "photograph of photomaker"}),
-                             }}
+        return {
+            "required": {
+                "photomaker": ("PHOTOMAKER",),
+                "image": ("IMAGE",),
+                "clip": ("CLIP",),
+                "text": ("STRING", {"multiline": True, "dynamicPrompts": True, "default": "photograph of photomaker"}),
+            }
+        }
 
     RETURN_TYPES = ("CONDITIONING",)
     FUNCTION = "apply_photomaker"
@@ -171,17 +171,19 @@ class PhotoMakerEncode:
         if index > 0:
             token_index = index - 1
             num_id_images = 1
-            class_tokens_mask = [True if token_index <= i < token_index+num_id_images else False for i in range(77)]
-            out = photomaker(id_pixel_values=pixel_values.unsqueeze(0), prompt_embeds=cond.to(photomaker.load_device),
-                            class_tokens_mask=torch.tensor(class_tokens_mask, dtype=torch.bool, device=photomaker.load_device).unsqueeze(0))
+            class_tokens_mask = [True if token_index <= i < token_index + num_id_images else False for i in range(77)]
+            out = photomaker(
+                id_pixel_values=pixel_values.unsqueeze(0),
+                prompt_embeds=cond.to(photomaker.load_device),
+                class_tokens_mask=torch.tensor(class_tokens_mask, dtype=torch.bool, device=photomaker.load_device).unsqueeze(0),
+            )
         else:
             out = cond
 
-        return ([[out, {"pooled_output": pooled}]], )
+        return ([[out, {"pooled_output": pooled}]],)
 
 
 NODE_CLASS_MAPPINGS = {
     "PhotoMakerLoader": PhotoMakerLoader,
     "PhotoMakerEncode": PhotoMakerEncode,
 }
-

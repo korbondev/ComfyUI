@@ -1,6 +1,6 @@
 from .utils import load_torch_file, transformers_convert, state_dict_prefix_replace
 import os
-import torch
+import oneflow
 import json
 import logging
 
@@ -10,26 +10,30 @@ import comfy.model_management
 import comfy.utils
 import comfy.clip_model
 
+
 class Output:
     def __getitem__(self, key):
         return getattr(self, key)
+
     def __setitem__(self, key, item):
         setattr(self, key, item)
 
+
 def clip_preprocess(image, size=224):
-    mean = torch.tensor([ 0.48145466,0.4578275,0.40821073], device=image.device, dtype=image.dtype)
-    std = torch.tensor([0.26862954,0.26130258,0.27577711], device=image.device, dtype=image.dtype)
+    mean = torch.tensor([0.48145466, 0.4578275, 0.40821073], device=image.device, dtype=image.dtype)
+    std = torch.tensor([0.26862954, 0.26130258, 0.27577711], device=image.device, dtype=image.dtype)
     image = image.movedim(-1, 1)
     if not (image.shape[2] == size and image.shape[3] == size):
-        scale = (size / min(image.shape[2], image.shape[3]))
+        scale = size / min(image.shape[2], image.shape[3])
         image = torch.nn.functional.interpolate(image, size=(round(scale * image.shape[2]), round(scale * image.shape[3])), mode="bicubic", antialias=True)
-        h = (image.shape[2] - size)//2
-        w = (image.shape[3] - size)//2
-        image = image[:,:,h:h+size,w:w+size]
-    image = torch.clip((255. * image), 0, 255).round() / 255.0
-    return (image - mean.view([3,1,1])) / std.view([3,1,1])
+        h = (image.shape[2] - size) // 2
+        w = (image.shape[3] - size) // 2
+        image = image[:, :, h : h + size, w : w + size]
+    image = torch.clip((255.0 * image), 0, 255).round() / 255.0
+    return (image - mean.view([3, 1, 1])) / std.view([3, 1, 1])
 
-class ClipVisionModel():
+
+class ClipVisionModel:
     def __init__(self, json_config):
         with open(json_config) as f:
             config = json.load(f)
@@ -60,6 +64,7 @@ class ClipVisionModel():
         outputs["penultimate_hidden_states"] = out[1].to(comfy.model_management.intermediate_device())
         return outputs
 
+
 def convert_to_transformers(sd, prefix):
     sd_k = sd.keys()
     if "{}transformer.resblocks.0.attn.in_proj_weight".format(prefix) in sd_k:
@@ -78,13 +83,14 @@ def convert_to_transformers(sd, prefix):
                 sd[keys_to_replace[x]] = sd.pop(x)
 
         if "{}proj".format(prefix) in sd_k:
-            sd['visual_projection.weight'] = sd.pop("{}proj".format(prefix)).transpose(0, 1)
+            sd["visual_projection.weight"] = sd.pop("{}proj".format(prefix)).transpose(0, 1)
 
         sd = transformers_convert(sd, prefix, "vision_model.", 48)
     else:
         replace_prefix = {prefix: ""}
         sd = state_dict_prefix_replace(sd, replace_prefix)
     return sd
+
 
 def load_clipvision_from_sd(sd, prefix="", convert_keys=False):
     if convert_keys:
@@ -112,6 +118,7 @@ def load_clipvision_from_sd(sd, prefix="", convert_keys=False):
             t = sd.pop(k)
             del t
     return clip
+
 
 def load(ckpt_path):
     sd = load_torch_file(ckpt_path)

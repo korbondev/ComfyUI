@@ -1,5 +1,5 @@
 import re
-import torch
+import oneflow
 import logging
 
 # conversion code from https://github.com/huggingface/diffusers/blob/main/scripts/convert_diffusers_to_original_stable_diffusion.py
@@ -206,6 +206,7 @@ textenc_pattern = re.compile("|".join(protected.keys()))
 # Ordering is from https://github.com/pytorch/pytorch/blob/master/test/cpp/api/modules.cpp
 code2idx = {"q": 0, "k": 1, "v": 2}
 
+
 # This function exists because at the time of writing torch.cat can't do fp8 with cuda
 def cat_tensors(tensors):
     x = 0
@@ -217,10 +218,11 @@ def cat_tensors(tensors):
 
     x = 0
     for t in tensors:
-        out[x:x + t.shape[0]] = t
+        out[x : x + t.shape[0]] = t
         x += t.shape[0]
 
     return out
+
 
 def convert_text_enc_state_dict_v20(text_enc_dict, prefix=""):
     new_state_dict = {}
@@ -229,11 +231,7 @@ def convert_text_enc_state_dict_v20(text_enc_dict, prefix=""):
     for k, v in text_enc_dict.items():
         if not k.startswith(prefix):
             continue
-        if (
-                k.endswith(".self_attn.q_proj.weight")
-                or k.endswith(".self_attn.k_proj.weight")
-                or k.endswith(".self_attn.v_proj.weight")
-        ):
+        if k.endswith(".self_attn.q_proj.weight") or k.endswith(".self_attn.k_proj.weight") or k.endswith(".self_attn.v_proj.weight"):
             k_pre = k[: -len(".q_proj.weight")]
             k_code = k[-len("q_proj.weight")]
             if k_pre not in capture_qkv_weight:
@@ -241,11 +239,7 @@ def convert_text_enc_state_dict_v20(text_enc_dict, prefix=""):
             capture_qkv_weight[k_pre][code2idx[k_code]] = v
             continue
 
-        if (
-                k.endswith(".self_attn.q_proj.bias")
-                or k.endswith(".self_attn.k_proj.bias")
-                or k.endswith(".self_attn.v_proj.bias")
-        ):
+        if k.endswith(".self_attn.q_proj.bias") or k.endswith(".self_attn.k_proj.bias") or k.endswith(".self_attn.v_proj.bias"):
             k_pre = k[: -len(".q_proj.bias")]
             k_code = k[-len("q_proj.bias")]
             if k_pre not in capture_qkv_bias:
@@ -277,5 +271,3 @@ def convert_text_enc_state_dict_v20(text_enc_dict, prefix=""):
 
 def convert_text_enc_state_dict(text_enc_dict):
     return text_enc_dict
-
-

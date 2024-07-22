@@ -1,12 +1,17 @@
 # code adapted from https://github.com/exx8/differential-diffusion
 
-import torch
+import oneflow
 
-class DifferentialDiffusion():
+
+class DifferentialDiffusion:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": {"model": ("MODEL", ),
-                            }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+            }
+        }
+
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "apply"
     CATEGORY = "_for_testing"

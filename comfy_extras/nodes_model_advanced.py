@@ -2,7 +2,8 @@ import folder_paths
 import comfy.sd
 import comfy.model_sampling
 import comfy.latent_formats
-import torch
+import oneflow
+
 
 class LCM(comfy.model_sampling.EPS):
     def calculate_denoised(self, sigma, model_output, model_input):
@@ -11,16 +12,18 @@ class LCM(comfy.model_sampling.EPS):
         x0 = model_input - model_output * sigma
 
         sigma_data = 0.5
-        scaled_timestep = timestep * 10.0 #timestep_scaling
+        scaled_timestep = timestep * 10.0  # timestep_scaling
 
         c_skip = sigma_data**2 / (scaled_timestep**2 + sigma_data**2)
         c_out = scaled_timestep / (scaled_timestep**2 + sigma_data**2) ** 0.5
 
         return c_out * x0 + c_skip * model_input
 
+
 class X0(comfy.model_sampling.EPS):
     def calculate_denoised(self, sigma, model_output, model_input):
         return model_output
+
 
 class ModelSamplingDiscreteDistilled(comfy.model_sampling.ModelSamplingDiscrete):
     original_timesteps = 50
@@ -59,7 +62,7 @@ def rescale_zero_terminal_snr_sigmas(sigmas):
     alphas_bar_sqrt_T = alphas_bar_sqrt[-1].clone()
 
     # Shift so the last timestep is zero.
-    alphas_bar_sqrt -= (alphas_bar_sqrt_T)
+    alphas_bar_sqrt -= alphas_bar_sqrt_T
 
     # Scale so the first timestep is back to the old value.
     alphas_bar_sqrt *= alphas_bar_sqrt_0 / (alphas_bar_sqrt_0 - alphas_bar_sqrt_T)
@@ -69,13 +72,17 @@ def rescale_zero_terminal_snr_sigmas(sigmas):
     alphas_bar[-1] = 4.8973451890853435e-08
     return ((1 - alphas_bar) / alphas_bar) ** 0.5
 
+
 class ModelSamplingDiscrete:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                              "sampling": (["eps", "v_prediction", "lcm", "x0"],),
-                              "zsnr": ("BOOLEAN", {"default": False}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "sampling": (["eps", "v_prediction", "lcm", "x0"],),
+                "zsnr": ("BOOLEAN", {"default": False}),
+            }
+        }
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
@@ -104,14 +111,18 @@ class ModelSamplingDiscrete:
             model_sampling.set_sigmas(rescale_zero_terminal_snr_sigmas(model_sampling.sigmas))
 
         m.add_object_patch("model_sampling", model_sampling)
-        return (m, )
+        return (m,)
+
 
 class ModelSamplingStableCascade:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                              "shift": ("FLOAT", {"default": 2.0, "min": 0.0, "max": 100.0, "step":0.01}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "shift": ("FLOAT", {"default": 2.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+            }
+        }
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
@@ -130,14 +141,18 @@ class ModelSamplingStableCascade:
         model_sampling = ModelSamplingAdvanced(model.model.model_config)
         model_sampling.set_parameters(shift)
         m.add_object_patch("model_sampling", model_sampling)
-        return (m, )
+        return (m,)
+
 
 class ModelSamplingSD3:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                              "shift": ("FLOAT", {"default": 3.0, "min": 0.0, "max": 100.0, "step":0.01}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "shift": ("FLOAT", {"default": 3.0, "min": 0.0, "max": 100.0, "step": 0.01}),
+            }
+        }
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
@@ -156,28 +171,36 @@ class ModelSamplingSD3:
         model_sampling = ModelSamplingAdvanced(model.model.model_config)
         model_sampling.set_parameters(shift=shift, multiplier=multiplier)
         m.add_object_patch("model_sampling", model_sampling)
-        return (m, )
+        return (m,)
+
 
 class ModelSamplingAuraFlow(ModelSamplingSD3):
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                              "shift": ("FLOAT", {"default": 1.73, "min": 0.0, "max": 100.0, "step":0.01}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "shift": ("FLOAT", {"default": 1.73, "min": 0.0, "max": 100.0, "step": 0.01}),
+            }
+        }
 
     FUNCTION = "patch_aura"
 
     def patch_aura(self, model, shift):
         return self.patch(model, shift, multiplier=1.0)
 
+
 class ModelSamplingContinuousEDM:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                              "sampling": (["v_prediction", "edm_playground_v2.5", "eps"],),
-                              "sigma_max": ("FLOAT", {"default": 120.0, "min": 0.0, "max": 1000.0, "step":0.001, "round": False}),
-                              "sigma_min": ("FLOAT", {"default": 0.002, "min": 0.0, "max": 1000.0, "step":0.001, "round": False}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "sampling": (["v_prediction", "edm_playground_v2.5", "eps"],),
+                "sigma_max": ("FLOAT", {"default": 120.0, "min": 0.0, "max": 1000.0, "step": 0.001, "round": False}),
+                "sigma_min": ("FLOAT", {"default": 0.002, "min": 0.0, "max": 1000.0, "step": 0.001, "round": False}),
+            }
+        }
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
@@ -206,16 +229,20 @@ class ModelSamplingContinuousEDM:
         m.add_object_patch("model_sampling", model_sampling)
         if latent_format is not None:
             m.add_object_patch("latent_format", latent_format)
-        return (m, )
+        return (m,)
+
 
 class ModelSamplingContinuousV:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                              "sampling": (["v_prediction"],),
-                              "sigma_max": ("FLOAT", {"default": 500.0, "min": 0.0, "max": 1000.0, "step":0.001, "round": False}),
-                              "sigma_min": ("FLOAT", {"default": 0.03, "min": 0.0, "max": 1000.0, "step":0.001, "round": False}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "sampling": (["v_prediction"],),
+                "sigma_max": ("FLOAT", {"default": 500.0, "min": 0.0, "max": 1000.0, "step": 0.001, "round": False}),
+                "sigma_min": ("FLOAT", {"default": 0.03, "min": 0.0, "max": 1000.0, "step": 0.001, "round": False}),
+            }
+        }
 
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
@@ -236,14 +263,19 @@ class ModelSamplingContinuousV:
         model_sampling = ModelSamplingAdvanced(model.model.model_config)
         model_sampling.set_parameters(sigma_min, sigma_max, sigma_data)
         m.add_object_patch("model_sampling", model_sampling)
-        return (m, )
+        return (m,)
+
 
 class RescaleCFG:
     @classmethod
     def INPUT_TYPES(s):
-        return {"required": { "model": ("MODEL",),
-                              "multiplier": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
-                              }}
+        return {
+            "required": {
+                "model": ("MODEL",),
+                "multiplier": ("FLOAT", {"default": 0.7, "min": 0.0, "max": 1.0, "step": 0.01}),
+            }
+        }
+
     RETURN_TYPES = ("MODEL",)
     FUNCTION = "patch"
 
@@ -258,15 +290,15 @@ class RescaleCFG:
             sigma = sigma.view(sigma.shape[:1] + (1,) * (cond.ndim - 1))
             x_orig = args["input"]
 
-            #rescale cfg has to be done on v-pred model output
+            # rescale cfg has to be done on v-pred model output
             x = x_orig / (sigma * sigma + 1.0)
-            cond = ((x - (x_orig - cond)) * (sigma ** 2 + 1.0) ** 0.5) / (sigma)
-            uncond = ((x - (x_orig - uncond)) * (sigma ** 2 + 1.0) ** 0.5) / (sigma)
+            cond = ((x - (x_orig - cond)) * (sigma**2 + 1.0) ** 0.5) / (sigma)
+            uncond = ((x - (x_orig - uncond)) * (sigma**2 + 1.0) ** 0.5) / (sigma)
 
-            #rescalecfg
+            # rescalecfg
             x_cfg = uncond + cond_scale * (cond - uncond)
-            ro_pos = torch.std(cond, dim=(1,2,3), keepdim=True)
-            ro_cfg = torch.std(x_cfg, dim=(1,2,3), keepdim=True)
+            ro_pos = torch.std(cond, dim=(1, 2, 3), keepdim=True)
+            ro_cfg = torch.std(x_cfg, dim=(1, 2, 3), keepdim=True)
 
             x_rescaled = x_cfg * (ro_pos / ro_cfg)
             x_final = multiplier * x_rescaled + (1.0 - multiplier) * x_cfg
@@ -275,7 +307,8 @@ class RescaleCFG:
 
         m = model.clone()
         m.set_model_sampler_cfg_function(rescale_cfg)
-        return (m, )
+        return (m,)
+
 
 NODE_CLASS_MAPPINGS = {
     "ModelSamplingDiscrete": ModelSamplingDiscrete,

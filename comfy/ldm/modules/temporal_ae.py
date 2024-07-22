@@ -1,10 +1,11 @@
 import functools
 from typing import Callable, Iterable, Union
 
-import torch
+import oneflow
 from einops import rearrange, repeat
 
 import comfy.ops
+
 ops = comfy.ops.disable_weight_init
 
 from .diffusionmodules.model import (
@@ -14,6 +15,7 @@ from .diffusionmodules.model import (
 )
 from .diffusionmodules.openaimodel import ResBlock, timestep_embedding
 from .attention import BasicTransformerBlock
+
 
 def partialclass(cls, *args, **kwargs):
     class NewCls(cls):
@@ -54,9 +56,7 @@ class VideoResBlock(ResnetBlock):
         if self.merge_strategy == "fixed":
             self.register_buffer("mix_factor", torch.Tensor([alpha]))
         elif self.merge_strategy == "learned":
-            self.register_parameter(
-                "mix_factor", torch.nn.Parameter(torch.Tensor([alpha]))
-            )
+            self.register_parameter("mix_factor", torch.nn.Parameter(torch.Tensor([alpha])))
         else:
             raise ValueError(f"unknown merge strategy {self.merge_strategy}")
 
@@ -116,9 +116,7 @@ class AE3DConv(ops.Conv2d):
 
 
 class AttnVideoBlock(AttnBlock):
-    def __init__(
-        self, in_channels: int, alpha: float = 0, merge_strategy: str = "learned"
-    ):
+    def __init__(self, in_channels: int, alpha: float = 0, merge_strategy: str = "learned"):
         super().__init__(in_channels)
         # no context, single headed, as in base class
         self.time_mix_block = BasicTransformerBlock(
@@ -140,9 +138,7 @@ class AttnVideoBlock(AttnBlock):
         if self.merge_strategy == "fixed":
             self.register_buffer("mix_factor", torch.Tensor([alpha]))
         elif self.merge_strategy == "learned":
-            self.register_parameter(
-                "mix_factor", torch.nn.Parameter(torch.Tensor([alpha]))
-            )
+            self.register_parameter("mix_factor", torch.nn.Parameter(torch.Tensor([alpha])))
         else:
             raise ValueError(f"unknown merge strategy {self.merge_strategy}")
 
@@ -187,7 +183,6 @@ class AttnVideoBlock(AttnBlock):
             raise NotImplementedError(f"unknown merge strategy {self.merge_strategy}")
 
 
-
 def make_time_attn(
     in_channels,
     attn_type="vanilla",
@@ -195,9 +190,7 @@ def make_time_attn(
     alpha: float = 0,
     merge_strategy: str = "learned",
 ):
-    return partialclass(
-        AttnVideoBlock, in_channels, alpha=alpha, merge_strategy=merge_strategy
-    )
+    return partialclass(AttnVideoBlock, in_channels, alpha=alpha, merge_strategy=merge_strategy)
 
 
 class Conv2DWrapper(torch.nn.Conv2d):
@@ -221,9 +214,7 @@ class VideoDecoder(Decoder):
         self.alpha = alpha
         self.merge_strategy = merge_strategy
         self.time_mode = time_mode
-        assert (
-            self.time_mode in self.available_time_modes
-        ), f"time_mode parameter has to be in {self.available_time_modes}"
+        assert self.time_mode in self.available_time_modes, f"time_mode parameter has to be in {self.available_time_modes}"
 
         if self.time_mode != "attn-only":
             kwargs["conv_out_op"] = partialclass(AE3DConv, video_kernel_size=self.video_kernel_size)
@@ -238,8 +229,4 @@ class VideoDecoder(Decoder):
         if self.time_mode == "attn-only":
             raise NotImplementedError("TODO")
         else:
-            return (
-                self.conv_out.time_mix_conv.weight
-                if not skip_time_mix
-                else self.conv_out.weight
-            )
+            return self.conv_out.time_mix_conv.weight if not skip_time_mix else self.conv_out.weight

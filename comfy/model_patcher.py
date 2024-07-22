@@ -1,4 +1,4 @@
-import torch
+import oneflow
 import copy
 import inspect
 import logging
@@ -51,17 +51,20 @@ def set_model_options_patch_replace(model_options, patch, name, block_name, numb
     model_options["transformer_options"] = to
     return model_options
 
+
 def set_model_options_post_cfg_function(model_options, post_cfg_function, disable_cfg1_optimization=False):
     model_options["sampler_post_cfg_function"] = model_options.get("sampler_post_cfg_function", []) + [post_cfg_function]
     if disable_cfg1_optimization:
         model_options["disable_cfg1_optimization"] = True
     return model_options
 
+
 def set_model_options_pre_cfg_function(model_options, pre_cfg_function, disable_cfg1_optimization=False):
     model_options["sampler_pre_cfg_function"] = model_options.get("sampler_pre_cfg_function", []) + [pre_cfg_function]
     if disable_cfg1_optimization:
         model_options["disable_cfg1_optimization"] = True
     return model_options
+
 
 class ModelPatcher:
     def __init__(self, model, load_device, offload_device, size=0, current_device=None, weight_inplace_update=False):
@@ -71,7 +74,7 @@ class ModelPatcher:
         self.backup = {}
         self.object_patches = {}
         self.object_patches_backup = {}
-        self.model_options = {"transformer_options":{}}
+        self.model_options = {"transformer_options": {}}
         self.model_size()
         self.load_device = load_device
         self.offload_device = offload_device
@@ -105,7 +108,7 @@ class ModelPatcher:
         return n
 
     def is_clone(self, other):
-        if hasattr(other, 'model') and self.model is other.model:
+        if hasattr(other, "model") and self.model is other.model:
             return True
         return False
 
@@ -127,7 +130,7 @@ class ModelPatcher:
 
     def set_model_sampler_cfg_function(self, sampler_cfg_function, disable_cfg1_optimization=False):
         if len(inspect.signature(sampler_cfg_function).parameters) == 3:
-            self.model_options["sampler_cfg_function"] = lambda args: sampler_cfg_function(args["cond"], args["uncond"], args["cond_scale"]) #Old way
+            self.model_options["sampler_cfg_function"] = lambda args: sampler_cfg_function(args["cond"], args["uncond"], args["cond_scale"])  # Old way
         else:
             self.model_options["sampler_cfg_function"] = sampler_cfg_function
         if disable_cfg1_optimization:
@@ -309,11 +312,13 @@ class ModelPatcher:
     def patch_model_lowvram(self, device_to=None, lowvram_model_memory=0, force_patch_weights=False):
         self.patch_model(device_to, patch_weights=False)
 
-        logging.info("loading in lowvram mode {}".format(lowvram_model_memory/(1024 * 1024)))
+        logging.info("loading in lowvram mode {}".format(lowvram_model_memory / (1024 * 1024)))
+
         class LowVramPatch:
             def __init__(self, key, model_patcher):
                 self.key = key
                 self.model_patcher = model_patcher
+
             def __call__(self, weight):
                 return self.model_patcher.calculate_weight(self.model_patcher.patches[self.key], weight, self.key)
 
@@ -376,7 +381,7 @@ class ModelPatcher:
                 weight *= strength_model
 
             if isinstance(v, list):
-                v = (self.calculate_weight(v[1:], v[0].clone(), key), )
+                v = (self.calculate_weight(v[1:], v[0].clone(), key),)
 
             if len(v) == 1:
                 patch_type = "diff"
@@ -391,7 +396,7 @@ class ModelPatcher:
                         logging.warning("WARNING SHAPE MISMATCH {} WEIGHT NOT MERGED {} != {}".format(key, w1.shape, weight.shape))
                     else:
                         weight += function(strength * comfy.model_management.cast_to_device(w1, weight.device, weight.dtype))
-            elif patch_type == "lora": #lora/locon
+            elif patch_type == "lora":  # lora/locon
                 mat1 = comfy.model_management.cast_to_device(v[0], weight.device, torch.float32)
                 mat2 = comfy.model_management.cast_to_device(v[1], weight.device, torch.float32)
                 dora_scale = v[4]
@@ -401,7 +406,7 @@ class ModelPatcher:
                     alpha = 1.0
 
                 if v[3] is not None:
-                    #locon mid weights, hopefully the math is fine because I didn't properly test it
+                    # locon mid weights, hopefully the math is fine because I didn't properly test it
                     mat3 = comfy.model_management.cast_to_device(v[3], weight.device, torch.float32)
                     final_shape = [mat2.shape[1], mat2.shape[0], mat3.shape[2], mat3.shape[3]]
                     mat2 = torch.mm(mat2.transpose(0, 1).flatten(start_dim=1), mat3.transpose(0, 1).flatten(start_dim=1)).reshape(final_shape).transpose(0, 1)
@@ -426,21 +431,27 @@ class ModelPatcher:
 
                 if w1 is None:
                     dim = w1_b.shape[0]
-                    w1 = torch.mm(comfy.model_management.cast_to_device(w1_a, weight.device, torch.float32),
-                                  comfy.model_management.cast_to_device(w1_b, weight.device, torch.float32))
+                    w1 = torch.mm(
+                        comfy.model_management.cast_to_device(w1_a, weight.device, torch.float32),
+                        comfy.model_management.cast_to_device(w1_b, weight.device, torch.float32),
+                    )
                 else:
                     w1 = comfy.model_management.cast_to_device(w1, weight.device, torch.float32)
 
                 if w2 is None:
                     dim = w2_b.shape[0]
                     if t2 is None:
-                        w2 = torch.mm(comfy.model_management.cast_to_device(w2_a, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w2_b, weight.device, torch.float32))
+                        w2 = torch.mm(
+                            comfy.model_management.cast_to_device(w2_a, weight.device, torch.float32),
+                            comfy.model_management.cast_to_device(w2_b, weight.device, torch.float32),
+                        )
                     else:
-                        w2 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                          comfy.model_management.cast_to_device(t2, weight.device, torch.float32),
-                                          comfy.model_management.cast_to_device(w2_b, weight.device, torch.float32),
-                                          comfy.model_management.cast_to_device(w2_a, weight.device, torch.float32))
+                        w2 = torch.einsum(
+                            "i j k l, j r, i p -> p r k l",
+                            comfy.model_management.cast_to_device(t2, weight.device, torch.float32),
+                            comfy.model_management.cast_to_device(w2_b, weight.device, torch.float32),
+                            comfy.model_management.cast_to_device(w2_a, weight.device, torch.float32),
+                        )
                 else:
                     w2 = comfy.model_management.cast_to_device(w2, weight.device, torch.float32)
 
@@ -470,23 +481,31 @@ class ModelPatcher:
                 w2a = v[3]
                 w2b = v[4]
                 dora_scale = v[7]
-                if v[5] is not None: #cp decomposition
+                if v[5] is not None:  # cp decomposition
                     t1 = v[5]
                     t2 = v[6]
-                    m1 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                      comfy.model_management.cast_to_device(t1, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w1b, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w1a, weight.device, torch.float32))
+                    m1 = torch.einsum(
+                        "i j k l, j r, i p -> p r k l",
+                        comfy.model_management.cast_to_device(t1, weight.device, torch.float32),
+                        comfy.model_management.cast_to_device(w1b, weight.device, torch.float32),
+                        comfy.model_management.cast_to_device(w1a, weight.device, torch.float32),
+                    )
 
-                    m2 = torch.einsum('i j k l, j r, i p -> p r k l',
-                                      comfy.model_management.cast_to_device(t2, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w2b, weight.device, torch.float32),
-                                      comfy.model_management.cast_to_device(w2a, weight.device, torch.float32))
+                    m2 = torch.einsum(
+                        "i j k l, j r, i p -> p r k l",
+                        comfy.model_management.cast_to_device(t2, weight.device, torch.float32),
+                        comfy.model_management.cast_to_device(w2b, weight.device, torch.float32),
+                        comfy.model_management.cast_to_device(w2a, weight.device, torch.float32),
+                    )
                 else:
-                    m1 = torch.mm(comfy.model_management.cast_to_device(w1a, weight.device, torch.float32),
-                                  comfy.model_management.cast_to_device(w1b, weight.device, torch.float32))
-                    m2 = torch.mm(comfy.model_management.cast_to_device(w2a, weight.device, torch.float32),
-                                  comfy.model_management.cast_to_device(w2b, weight.device, torch.float32))
+                    m1 = torch.mm(
+                        comfy.model_management.cast_to_device(w1a, weight.device, torch.float32),
+                        comfy.model_management.cast_to_device(w1b, weight.device, torch.float32),
+                    )
+                    m2 = torch.mm(
+                        comfy.model_management.cast_to_device(w2a, weight.device, torch.float32),
+                        comfy.model_management.cast_to_device(w2b, weight.device, torch.float32),
+                    )
 
                 try:
                     lora_diff = (m1 * m2).reshape(weight.shape)

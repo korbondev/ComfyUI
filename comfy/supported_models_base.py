@@ -1,13 +1,15 @@
-import torch
+import oneflow
 from . import model_base
 from . import utils
 from . import latent_formats
+
 
 class ClipTarget:
     def __init__(self, tokenizer, clip):
         self.clip = clip
         self.tokenizer = tokenizer
         self.params = {}
+
 
 class BASE:
     unet_config = {}
@@ -91,5 +93,5 @@ class BASE:
         return utils.state_dict_prefix_replace(state_dict, replace_prefix)
 
     def set_inference_dtype(self, dtype, manual_cast_dtype):
-        self.unet_config['dtype'] = dtype
+        self.unet_config["dtype"] = dtype
         self.manual_cast_dtype = manual_cast_dtype

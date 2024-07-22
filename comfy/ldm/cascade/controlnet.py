@@ -16,7 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import torch
+import oneflow
 import torchvision
 from torch import nn
 from .common import LayerNorm2d_op
@@ -42,9 +42,9 @@ class ControlNet(nn.Module):
     def __init__(self, c_in=3, c_proj=2048, proj_blocks=None, bottleneck_mode=None, dtype=None, device=None, operations=nn):
         super().__init__()
         if bottleneck_mode is None:
-            bottleneck_mode = 'effnet'
+            bottleneck_mode = "effnet"
         self.proj_blocks = proj_blocks
-        if bottleneck_mode == 'effnet':
+        if bottleneck_mode == "effnet":
             embd_channels = 1280
             self.backbone = torchvision.models.efficientnet_v2_s().features.eval()
             if c_in != 3:
@@ -55,14 +55,14 @@ class ControlNet(nn.Module):
                     self.backbone[0][0].weight.data[:, :3] = in_weights[:, :3].clone()
                 else:
                     self.backbone[0][0].weight.data = in_weights[:, :c_in].clone()
-        elif bottleneck_mode == 'simple':
+        elif bottleneck_mode == "simple":
             embd_channels = c_in
             self.backbone = nn.Sequential(
                 operations.Conv2d(embd_channels, embd_channels * 4, kernel_size=3, padding=1, dtype=dtype, device=device),
                 nn.LeakyReLU(0.2, inplace=True),
                 operations.Conv2d(embd_channels * 4, embd_channels, kernel_size=3, padding=1, dtype=dtype, device=device),
             )
-        elif bottleneck_mode == 'large':
+        elif bottleneck_mode == "large":
             self.backbone = nn.Sequential(
                 operations.Conv2d(c_in, 4096 * 4, kernel_size=1, dtype=dtype, device=device),
                 nn.LeakyReLU(0.2, inplace=True),
@@ -72,14 +72,16 @@ class ControlNet(nn.Module):
             )
             embd_channels = 1280
         else:
-            raise ValueError(f'Unknown bottleneck mode: {bottleneck_mode}')
+            raise ValueError(f"Unknown bottleneck mode: {bottleneck_mode}")
         self.projections = nn.ModuleList()
         for _ in range(len(proj_blocks)):
-            self.projections.append(nn.Sequential(
-                operations.Conv2d(embd_channels, embd_channels, kernel_size=1, bias=False, dtype=dtype, device=device),
-                nn.LeakyReLU(0.2, inplace=True),
-                operations.Conv2d(embd_channels, c_proj, kernel_size=1, bias=False, dtype=dtype, device=device),
-            ))
+            self.projections.append(
+                nn.Sequential(
+                    operations.Conv2d(embd_channels, embd_channels, kernel_size=1, bias=False, dtype=dtype, device=device),
+                    nn.LeakyReLU(0.2, inplace=True),
+                    operations.Conv2d(embd_channels, c_proj, kernel_size=1, bias=False, dtype=dtype, device=device),
+                )
+            )
             # nn.init.constant_(self.projections[-1][-1].weight, 0)  # zero output projection
         self.xl = False
         self.input_channels = c_in

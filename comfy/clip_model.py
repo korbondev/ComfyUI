@@ -1,5 +1,6 @@
-import torch
+import oneflow
 from comfy.ldm.modules.attention import optimized_attention_for_device
+
 
 class CLIPAttention(torch.nn.Module):
     def __init__(self, embed_dim, heads, dtype, device, operations):
@@ -20,9 +21,12 @@ class CLIPAttention(torch.nn.Module):
         out = optimized_attention(q, k, v, self.heads, mask)
         return self.out_proj(out)
 
-ACTIVATIONS = {"quick_gelu": lambda a: a * torch.sigmoid(1.702 * a),
-               "gelu": torch.nn.functional.gelu,
+
+ACTIVATIONS = {
+    "quick_gelu": lambda a: a * torch.sigmoid(1.702 * a),
+    "gelu": torch.nn.functional.gelu,
 }
+
 
 class CLIPMLP(torch.nn.Module):
     def __init__(self, embed_dim, intermediate_size, activation, dtype, device, operations):
@@ -36,6 +40,7 @@ class CLIPMLP(torch.nn.Module):
         x = self.activation(x)
         x = self.fc2(x)
         return x
+
 
 class CLIPLayer(torch.nn.Module):
     def __init__(self, embed_dim, heads, intermediate_size, intermediate_activation, dtype, device, operations):
@@ -54,7 +59,9 @@ class CLIPLayer(torch.nn.Module):
 class CLIPEncoder(torch.nn.Module):
     def __init__(self, num_layers, embed_dim, heads, intermediate_size, intermediate_activation, dtype, device, operations):
         super().__init__()
-        self.layers = torch.nn.ModuleList([CLIPLayer(embed_dim, heads, intermediate_size, intermediate_activation, dtype, device, operations) for i in range(num_layers)])
+        self.layers = torch.nn.ModuleList(
+            [CLIPLayer(embed_dim, heads, intermediate_size, intermediate_activation, dtype, device, operations) for i in range(num_layers)]
+        )
 
     def forward(self, x, mask=None, intermediate_output=None):
         optimized_attention = optimized_attention_for_device(x.device, mask=mask is not None, small_input=True)
@@ -69,6 +76,7 @@ class CLIPEncoder(torch.nn.Module):
             if i == intermediate_output:
                 intermediate = x.clone()
         return x, intermediate
+
 
 class CLIPEmbeddings(torch.nn.Module):
     def __init__(self, embed_dim, vocab_size=49408, num_positions=77, dtype=None, device=None):
@@ -97,7 +105,9 @@ class CLIPTextModel_(torch.nn.Module):
         x = self.embeddings(input_tokens)
         mask = None
         if attention_mask is not None:
-            mask = 1.0 - attention_mask.to(x.dtype).reshape((attention_mask.shape[0], 1, -1, attention_mask.shape[-1])).expand(attention_mask.shape[0], 1, attention_mask.shape[-1], attention_mask.shape[-1])
+            mask = 1.0 - attention_mask.to(x.dtype).reshape((attention_mask.shape[0], 1, -1, attention_mask.shape[-1])).expand(
+                attention_mask.shape[0], 1, attention_mask.shape[-1], attention_mask.shape[-1]
+            )
             mask = mask.masked_fill(mask.to(torch.bool), float("-inf"))
 
         causal_mask = torch.empty(x.shape[1], x.shape[1], dtype=x.dtype, device=x.device).fill_(float("-inf")).triu_(1)
@@ -111,8 +121,12 @@ class CLIPTextModel_(torch.nn.Module):
         if i is not None and final_layer_norm_intermediate:
             i = self.final_layer_norm(i)
 
-        pooled_output = x[torch.arange(x.shape[0], device=x.device), input_tokens.to(dtype=torch.int, device=x.device).argmax(dim=-1),]
+        pooled_output = x[
+            torch.arange(x.shape[0], device=x.device),
+            input_tokens.to(dtype=torch.int, device=x.device).argmax(dim=-1),
+        ]
         return x, i, pooled_output
+
 
 class CLIPTextModel(torch.nn.Module):
     def __init__(self, config_dict, dtype, device, operations):
@@ -142,13 +156,7 @@ class CLIPVisionEmbeddings(torch.nn.Module):
         self.class_embedding = torch.nn.Parameter(torch.empty(embed_dim, dtype=dtype, device=device))
 
         self.patch_embedding = operations.Conv2d(
-            in_channels=num_channels,
-            out_channels=embed_dim,
-            kernel_size=patch_size,
-            stride=patch_size,
-            bias=False,
-            dtype=dtype,
-            device=device
+            in_channels=num_channels, out_channels=embed_dim, kernel_size=patch_size, stride=patch_size, bias=False, dtype=dtype, device=device
         )
 
         num_patches = (image_size // patch_size) ** 2
@@ -157,7 +165,9 @@ class CLIPVisionEmbeddings(torch.nn.Module):
 
     def forward(self, pixel_values):
         embeds = self.patch_embedding(pixel_values).flatten(2).transpose(1, 2)
-        return torch.cat([self.class_embedding.to(embeds.device).expand(pixel_values.shape[0], 1, -1), embeds], dim=1) + self.position_embedding.weight.to(embeds.device)
+        return torch.cat([self.class_embedding.to(embeds.device).expand(pixel_values.shape[0], 1, -1), embeds], dim=1) + self.position_embedding.weight.to(
+            embeds.device
+        )
 
 
 class CLIPVision(torch.nn.Module):
@@ -169,7 +179,9 @@ class CLIPVision(torch.nn.Module):
         intermediate_size = config_dict["intermediate_size"]
         intermediate_activation = config_dict["hidden_act"]
 
-        self.embeddings = CLIPVisionEmbeddings(embed_dim, config_dict["num_channels"], config_dict["patch_size"], config_dict["image_size"], dtype=torch.float32, device=device, operations=operations)
+        self.embeddings = CLIPVisionEmbeddings(
+            embed_dim, config_dict["num_channels"], config_dict["patch_size"], config_dict["image_size"], dtype=torch.float32, device=device, operations=operations
+        )
         self.pre_layrnorm = operations.LayerNorm(embed_dim)
         self.encoder = CLIPEncoder(num_layers, embed_dim, heads, intermediate_size, intermediate_activation, dtype, device, operations)
         self.post_layernorm = operations.LayerNorm(embed_dim)
@@ -177,10 +189,11 @@ class CLIPVision(torch.nn.Module):
     def forward(self, pixel_values, attention_mask=None, intermediate_output=None):
         x = self.embeddings(pixel_values)
         x = self.pre_layrnorm(x)
-        #TODO: attention_mask?
+        # TODO: attention_mask?
         x, i = self.encoder(x, mask=None, intermediate_output=intermediate_output)
         pooled_output = self.post_layernorm(x[:, 0, :])
         return x, i, pooled_output
+
 
 class CLIPVisionModelProjection(torch.nn.Module):
     def __init__(self, config_dict, dtype, device, operations):
