@@ -1,4 +1,4 @@
-import torch
+import oneflow as torch
 from typing import Callable, Protocol, TypedDict, Optional, List
 
 

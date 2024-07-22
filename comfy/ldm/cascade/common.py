@@ -16,17 +16,20 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 """
 
-import torch
-import torch.nn as nn
+import oneflow as torch
+import oneflow.nn as nn
 from comfy.ldm.modules.attention import optimized_attention
+
 
 class Linear(torch.nn.Linear):
     def reset_parameters(self):
         return None
 
+
 class Conv2d(torch.nn.Conv2d):
     def reset_parameters(self):
         return None
+
 
 class OptimizedAttention(nn.Module):
     def __init__(self, c, nhead, dropout=0.0, dtype=None, device=None, operations=None):
@@ -47,6 +50,7 @@ class OptimizedAttention(nn.Module):
         out = optimized_attention(q, k, v, self.heads)
 
         return self.out_proj(out)
+
 
 class Attention2D(nn.Module):
     def __init__(self, c, nhead, dropout=0.0, dtype=None, device=None, operations=None):
@@ -72,10 +76,13 @@ def LayerNorm2d_op(operations):
 
         def forward(self, x):
             return super().forward(x.permute(0, 2, 3, 1)).permute(0, 3, 1, 2)
+
     return LayerNorm2d
+
 
 class GlobalResponseNorm(nn.Module):
     "from https://github.com/facebookresearch/ConvNeXt-V2/blob/3608f67cc1dae164790c5d0aead7bf2d73d9719b/models/utils.py#L105"
+
     def __init__(self, dim, dtype=None, device=None):
         super().__init__()
         self.gamma = nn.Parameter(torch.zeros(1, 1, 1, dim, dtype=dtype, device=device))
@@ -98,7 +105,7 @@ class ResBlock(nn.Module):
             nn.GELU(),
             GlobalResponseNorm(c * 4, dtype=dtype, device=device),
             nn.Dropout(dropout),
-            operations.Linear(c * 4, c, dtype=dtype, device=device)
+            operations.Linear(c * 4, c, dtype=dtype, device=device),
         )
 
     def forward(self, x, x_skip=None):
@@ -116,10 +123,7 @@ class AttnBlock(nn.Module):
         self.self_attn = self_attn
         self.norm = LayerNorm2d_op(operations)(c, elementwise_affine=False, eps=1e-6, dtype=dtype, device=device)
         self.attention = Attention2D(c, nhead, dropout, dtype=dtype, device=device, operations=operations)
-        self.kv_mapper = nn.Sequential(
-            nn.SiLU(),
-            operations.Linear(c_cond, c, dtype=dtype, device=device)
-        )
+        self.kv_mapper = nn.Sequential(nn.SiLU(), operations.Linear(c_cond, c, dtype=dtype, device=device))
 
     def forward(self, x, kv):
         kv = self.kv_mapper(kv)
@@ -136,7 +140,7 @@ class FeedForwardBlock(nn.Module):
             nn.GELU(),
             GlobalResponseNorm(c * 4, dtype=dtype, device=device),
             nn.Dropout(dropout),
-            operations.Linear(c * 4, c, dtype=dtype, device=device)
+            operations.Linear(c * 4, c, dtype=dtype, device=device),
         )
 
     def forward(self, x):
@@ -145,7 +149,7 @@ class FeedForwardBlock(nn.Module):
 
 
 class TimestepBlock(nn.Module):
-    def __init__(self, c, c_timestep, conds=['sca'], dtype=None, device=None, operations=None):
+    def __init__(self, c, c_timestep, conds=["sca"], dtype=None, device=None, operations=None):
         super().__init__()
         self.mapper = operations.Linear(c_timestep, c * 2, dtype=dtype, device=device)
         self.conds = conds

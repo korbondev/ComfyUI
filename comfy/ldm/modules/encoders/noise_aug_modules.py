@@ -1,6 +1,7 @@
 from ..diffusionmodules.upscaling import ImageConcatWithNoiseAugmentation
 from ..diffusionmodules.openaimodel import Timestep
-import torch
+import oneflow as torch
+
 
 class CLIPEmbeddingNoiseAugmentation(ImageConcatWithNoiseAugmentation):
     def __init__(self, *args, clip_stats_path=None, timestep_dim=256, **kwargs):
@@ -15,7 +16,7 @@ class CLIPEmbeddingNoiseAugmentation(ImageConcatWithNoiseAugmentation):
 
     def scale(self, x):
         # re-normalize to centered mean and unit variance
-        x = (x - self.data_mean.to(x.device)) * 1. / self.data_std.to(x.device)
+        x = (x - self.data_mean.to(x.device)) * 1.0 / self.data_std.to(x.device)
         return x
 
     def unscale(self, x):
