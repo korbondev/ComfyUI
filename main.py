@@ -5,7 +5,7 @@ import os
 import importlib.util
 import folder_paths
 import time
-from comfy.cli_args import args
+from comfy.cli_args import args, LatentPreviewMethod
 
 
 def execute_prestartup_script():
@@ -165,7 +165,8 @@ def hijack_progress(server):
         progress = {"value": value, "max": total, "prompt_id": server.last_prompt_id, "node": server.last_node_id}
 
         server.send_sync("progress", progress, server.client_id)
-        if preview_image is not None:
+        preview_method = args.preview_method
+        if preview_image is not None and preview_method != LatentPreviewMethod.NoPreviews:
             server.send_sync(BinaryEventTypes.UNENCODED_PREVIEW_IMAGE, preview_image, server.client_id)
     comfy.utils.set_progress_bar_global_hook(hook)
 
