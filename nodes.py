@@ -13,6 +13,12 @@ import logging
 from PIL import Image, ImageOps, ImageSequence, ImageFile
 from PIL.PngImagePlugin import PngInfo
 
+from io import BytesIO
+
+import pyfpng  # https://github.com/qrmt/fpng-python # has to be installed directly from c++ using setup.py install
+import png  # pip install pypng
+
+
 import numpy as np
 import safetensors.torch
 
@@ -1482,9 +1488,13 @@ class SaveImage:
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         results = list()
-        for (batch_number, image) in enumerate(images):
-            i = 255. * image.cpu().numpy()
-            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+        for batch_number, image in enumerate(images):
+            i = 255.0 * image.cpu().numpy()
+            data = np.clip(i, 0, 255).astype(np.uint8)
+
+            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+            file = f"{filename_with_batch_num}_{counter:05}_.png"
+
             metadata = None
             if not args.disable_metadata:
                 metadata = PngInfo()
@@ -1494,9 +1504,18 @@ class SaveImage:
                     for x in extra_pnginfo:
                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
-            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.png"
-            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+            if metadata is not None and metadata.values():
+                success, img = pyfpng.encode_image_to_memory(data)
+                if not success:
+                    img = Image.fromarray(data)
+                else:
+                    with open(os.path.join(full_output_folder, file), "wb") as f:
+                        f.write(add_PngInfo_metadata_to_png_bytestring(img, metadata))
+            else:
+                success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data)
+                if not success:
+                    img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+
             results.append({
                 "filename": file,
                 "subfolder": subfolder,
@@ -1504,8 +1523,8 @@ class SaveImage:
             })
             counter += 1
 
-        return { "ui": { "images": results } }
-
+        return {"ui": {"images": results}}
+    
 class PreviewImage(SaveImage):
     def __init__(self):
         self.output_dir = folder_paths.get_temp_directory()
@@ -2118,3 +2137,26 @@ def init_extra_nodes(init_custom_nodes=True):
         else:
             logging.warning("Please do a: pip install -r requirements.txt")
         logging.warning("")
+
+
+
+def add_PngInfo_metadata_to_png_bytestring(png_bytes, pnginfo):
+    reader = png.Reader(bytes=png_bytes)
+    chunks = list(reader.chunks())
+
+    # Extract metadata chunks from PngInfo object
+    metadata_chunks = pnginfo.chunks
+
+    # Insert metadata chunks after the IHDR chunk
+    new_chunks = []
+    for chunk in chunks:
+        new_chunks.append(chunk)
+        if chunk[0] == b'IHDR':
+            new_chunks.extend(metadata_chunks)
+
+    # Write the new chunks to a bytes object
+    output_bytes_io = io.BytesIO()
+    writer = png.Writer(width=reader.width, height=reader.height, **reader.info)
+    writer.write_chunks(output_bytes_io, new_chunks)
+
+    return output_bytes_io.getvalue()
