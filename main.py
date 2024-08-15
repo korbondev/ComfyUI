@@ -1,3 +1,5 @@
+import cProfile
+import pstats
 import comfy.options
 
 comfy.options.enable_args_parsing()
@@ -293,16 +295,31 @@ if __name__ == "__main__":
 
     try:
         loop.run_until_complete(server.setup())
+
+        profiler = cProfile.Profile()
+        profiler.enable()
         try:
             main_run(run, loop, call_on_start)
+
+        # Load the profiling data
+
         except Exception as e:
             print(e)
             raise
         finally:
-            # write profiling cleanup code here
-            ...
+            profiler.disable()
+            profiler.dump_stats("profile_data.prof")
 
     except KeyboardInterrupt:
         logging.info("\nStopped server")
+        stats = pstats.Stats("profile_data.prof")
+
+        # Sort the data by cumulative time and print the top 10 functions
+        stats.sort_stats(pstats.SortKey.CUMULATIVE).print_stats(100)
+
+        # Optionally, you can save the sorted stats to a text file
+        with open("profile_report.txt", "w") as f:
+            stats = pstats.Stats("profile_data.prof", stream=f)
+            stats.sort_stats(pstats.SortKey.CUMULATIVE).print_stats(100)
 
     cleanup_temp()
