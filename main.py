@@ -315,11 +315,14 @@ if __name__ == "__main__":
         stats = pstats.Stats("profile_data.prof")
 
         # Sort the data by cumulative time and print the top 10 functions
-        stats.sort_stats(pstats.SortKey.CUMULATIVE).print_stats(100)
+        # stats.sort_stats(pstats.SortKey.CUMULATIVE).print_stats(10000)
 
         # Optionally, you can save the sorted stats to a text file
-        with open("profile_report.txt", "w") as f:
-            stats = pstats.Stats("profile_data.prof", stream=f)
-            stats.sort_stats(pstats.SortKey.CUMULATIVE).print_stats(100)
+        with open(f"profile_report.{int(time.time())}.txt", "w") as f:
+            stats = pstats.Stats(
+                "profile_data.prof",
+                stream=f,
+            )
+            stats.sort_stats(pstats.SortKey.CUMULATIVE).print_stats(10000)
 
     cleanup_temp()

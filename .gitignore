@@ -20,3 +20,5 @@ venv/
 *.log
 web_custom_versions/
 .DS_Store
+profile_report*
+profile_data.prof
