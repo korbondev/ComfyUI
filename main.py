@@ -109,6 +109,7 @@ def prompt_worker(q, server):
     while True:
         timeout = 1000.0
         if need_gc:
+            current_time = time.perf_counter()
             timeout = max(gc_collect_interval - (current_time - last_gc_collect), 0.0)
 
         queue_item = q.get(timeout=timeout)
