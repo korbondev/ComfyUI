@@ -1497,14 +1497,15 @@ class SaveImage:
 
             metadata = None
             if not args.disable_metadata:
-                metadata = PngInfo()
                 if prompt is not None:
+                    metadata = PngInfo()
                     metadata.add_text("prompt", json.dumps(prompt))
                 if extra_pnginfo is not None:
+                    metadata = PngInfo() if metadata is None else metadata
                     for x in extra_pnginfo:
                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
-            if metadata is not None and metadata.values():
+            if metadata is not None:
                 success, img = pyfpng.encode_image_to_memory(data)
                 if not success:
                     img = Image.fromarray(data)
