@@ -1495,28 +1495,32 @@ class SaveImage:
 
             filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
             file = f"{filename_with_batch_num}_{counter:05}_.png"
+            if False:
+                metadata = None
+                if not args.disable_metadata:
+                    if prompt is not None:
+                        metadata = PngInfo()
+                        metadata.add_text("prompt", json.dumps(prompt))
+                    if extra_pnginfo is not None:
+                        metadata = PngInfo() if metadata is None else metadata
+                        for x in extra_pnginfo:
+                            metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
-            metadata = None
-            if not args.disable_metadata:
-                if prompt is not None:
-                    metadata = PngInfo()
-                    metadata.add_text("prompt", json.dumps(prompt))
-                if extra_pnginfo is not None:
-                    metadata = PngInfo() if metadata is None else metadata
-                    for x in extra_pnginfo:
-                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
-
-            if metadata is not None:
-                success, img = pyfpng.encode_image_to_memory(data)
-                if not success:
-                    img = Image.fromarray(data)
+                if metadata is not None:
+                    success, img = pyfpng.encode_image_to_memory(data)
+                    if not success:
+                        img = Image.fromarray(data)
+                    else:
+                        with open(os.path.join(full_output_folder, file), "wb") as f:
+                            f.write(add_PngInfo_metadata_to_png_bytestring(img, metadata))
                 else:
-                    with open(os.path.join(full_output_folder, file), "wb") as f:
-                        f.write(add_PngInfo_metadata_to_png_bytestring(img, metadata))
+                    success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data)
+                    if not success:
+                        img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+
             else:
-                success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data)
-                if not success:
-                    img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+                img = Image.fromarray(data)
+                img.save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level)
 
             results.append({
                 "filename": file,
