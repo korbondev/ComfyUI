@@ -2141,22 +2141,23 @@ def init_extra_nodes(init_custom_nodes=True):
 
 
 
-def add_PngInfo_metadata_to_png_bytestring(png_bytes, pnginfo):
+def add_PngInfo_metadata_to_png_bytestring(png_bytes: bytes, pnginfo: PngInfo):
     reader = png.Reader(bytes=png_bytes)
+    chunks = list(reader.chunks())
+    
+    # Extract metadata chunks from PngInfo object
+    metadata_chunks = [(cid, data) for cid, data, after_idat in pnginfo.chunks]
     width, height, _, metadata = reader.asDirect()
-
-    metadata_chunks = pnginfo.chunks
-
-    output_bytes_io = BytesIO()
-    writer = png.Writer(width, height, **metadata)
-    ihdr_found = False
-    for chunk in reader.chunks():
-        writer.write_chunk(output_bytes_io, chunk)
+    # Insert metadata chunks after the IHDR chunk
+    new_chunks = []
+    for chunk in chunks:
+        new_chunks.append(chunk)
         if chunk[0] == b'IHDR':
-            ihdr_found = True
-            for metadata_chunk in metadata_chunks:
-                writer.write_chunk(output_bytes_io, metadata_chunk)
-    if not ihdr_found:
-        raise Exception("IHDR chunk not found in PNG image")
+            new_chunks.extend(metadata_chunks)
+
+    # Write the new chunks to a bytes object
+    output_bytes_io = BytesIO()
+    writer = png.Writer(width=width, height=height)
+    writer.write_chunks(output_bytes_io, new_chunks)
 
     return output_bytes_io.getvalue()
