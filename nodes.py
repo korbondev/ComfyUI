@@ -1,3 +1,4 @@
+import struct
 import torch
 
 import os
@@ -16,7 +17,7 @@ from PIL.PngImagePlugin import PngInfo
 from io import BytesIO
 
 import pyfpng  # https://github.com/qrmt/fpng-python # has to be installed directly from c++ using setup.py install
-import png  # pip install pypng
+# import png  # pip install pypng
 
 
 import numpy as np
@@ -2141,21 +2142,29 @@ def init_extra_nodes(init_custom_nodes=True):
 
 
 
-def add_PngInfo_metadata_to_png_bytestring(png_bytes: bytes, pnginfo: PngInfo):
-    # Create a PNG reader
-    reader = png.Reader(bytes=png_bytes)
+# Generate the CRC table
+CRC_TABLE = []
+for i in range(256):
+    crc = i
+    for _ in range(8):
+        if crc & 1:
+            crc = (crc >> 1) ^ 0xedb88320
+        else:
+            crc = crc >> 1
+    CRC_TABLE.append(crc)
 
-    # Get the width and height from the PNG reader
-    width, height, _, _ = reader.asDirect()
-
-    # Extract metadata chunks from PngInfo object
-    metadata_chunks = [(chunk[0], chunk[1]) for chunk in pnginfo.chunks]
-
-    # Create a PNG writer
-    writer = png.Writer(width=width, height=height)
-
-    # Create a new PNG file with the metadata chunks and image data
-    output_bytes_io = BytesIO()
-    writer.write_chunks(output_bytes_io, metadata_chunks + [(b'IHDR', png_bytes[16:25])] + [(b'IDAT', png_bytes[29:])])
-
-    return output_bytes_io.getvalue()
+def add_PngInfo_metadata_to_png_bytestring(png_bytestring, metadata):
+    chunks = []
+    for chunk in metadata:
+        chunk_type = chunk[0].encode('utf-8')
+        chunk_data = chunk[1]
+        chunk_length = len(chunk_data)
+        crc = 0xffffffff
+        for byte in chunk_type + chunk_data:
+            crc = (crc >> 8) ^ CRC_TABLE[(crc & 0xff) ^ byte]
+        chunks.append(struct.pack('>I', chunk_length) + chunk_type + chunk_data + struct.pack('>I', crc))
+    modified_png_data = BytesIO()
+    modified_png_data.write(png_bytestring[:21])
+    modified_png_data.write(b''.join(chunks))
+    modified_png_data.write(png_bytestring[21:])
+    return modified_png_data.getvalue()
