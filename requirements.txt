@@ -19,3 +19,7 @@ psutil
 kornia>=0.7.1
 spandrel
 soundfile
+pypng
+
+#git clone --recurse-submodules https://github.com/qrmt/fpng-python.git
+#python setup.py install
