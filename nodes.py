@@ -2153,9 +2153,9 @@ for i in range(256):
             crc = crc >> 1
     CRC_TABLE.append(crc)
 
-def add_PngInfo_metadata_to_png_bytestring(png_bytestring, metadata):
+def add_PngInfo_metadata_to_png_bytestring(png_bytestring:bytes, metadata:PngInfo):
     chunks = []
-    for chunk in metadata:
+    for chunk in metadata.chunks:
         chunk_type = chunk[0].encode('utf-8')
         chunk_data = chunk[1]
         chunk_length = len(chunk_data)
