@@ -2156,7 +2156,7 @@ def add_PngInfo_metadata_to_png_bytestring(png_bytes, pnginfo):
             new_chunks.extend(metadata_chunks)
 
     # Write the new chunks to a bytes object
-    output_bytes_io = io.BytesIO()
+    output_bytes_io = BytesIO()
     writer = png.Writer(width=reader.width, height=reader.height, **reader.info)
     writer.write_chunks(output_bytes_io, new_chunks)
 
