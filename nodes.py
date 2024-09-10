@@ -2146,7 +2146,7 @@ def add_PngInfo_metadata_to_png_bytestring(png_bytes: bytes, pnginfo: PngInfo):
     chunks = list(reader.chunks())
     
     # Extract metadata chunks from PngInfo object
-    metadata_chunks = [(cid, data) for cid, data, after_idat in pnginfo.chunks]
+    metadata_chunks = [(chunk[0], chunk[1]) for chunk in pnginfo.chunks]
     width, height, _, metadata = reader.asDirect()
     # Insert metadata chunks after the IHDR chunk
     new_chunks = []
