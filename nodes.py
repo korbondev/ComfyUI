@@ -2155,7 +2155,7 @@ for i in range(256):
 
 def add_PngInfo_metadata_to_png_bytestring(png_bytestring:bytes, metadata:PngInfo):
     chunks = []
-    for chunk in metadata:
+    for chunk in metadata.chunks:
         chunk_type = chunk[0]
         if not isinstance(chunk_type, bytes) or len(chunk_type) != 4:
             raise ValueError(f"Invalid chunk type: {chunk_type}")
