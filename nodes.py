@@ -38,7 +38,7 @@ import comfy.model_management
 from comfy.cli_args import args
 
 import importlib
-from torchvision.io import write_png
+# from torchvision.io import write_png
 
 import folder_paths
 import latent_preview
@@ -1491,13 +1491,13 @@ class SaveImage:
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         results = list()
         for batch_number, image in enumerate(images):
-            # i = 255.0 * image.cpu().numpy()
-            # data = np.clip(i, 0, 255).astype(np.uint8)
+            i = 255.0 * image.cpu().numpy()
+            data = np.clip(i, 0, 255).astype(np.uint8)
 
             filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
             file = f"{filename_with_batch_num}_{counter:05}_.png"
 
-            if False:
+            if True:
                 metadata = None
                 if not args.disable_metadata:
                     if prompt is not None:
@@ -1507,24 +1507,26 @@ class SaveImage:
                         metadata = PngInfo() if metadata is None else metadata
                         for x in extra_pnginfo:
                             metadata.add_text(x, json.dumps(extra_pnginfo[x]))
+                # swap the order of the channels from BGRA to RGBA
+                data2 = np.transpose(data, (1, 0, 2))  # swap axes 0 and 1
+                data2 = np.moveaxis(data, 0, -1)  # move axis 0 to the end
 
                 if metadata is not None:
-                    success, img = pyfpng.encode_image_to_memory(data)
+                    success, img = pyfpng.encode_image_to_memory(data2)
                     if not success:
                         img = Image.fromarray(data)
                     else:
                         with open(os.path.join(full_output_folder, file), "wb") as f:
                             f.write(add_PngInfo_metadata_to_png_bytestring(img, metadata))
                 else:
-                    success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data)
+                    success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data2)
                     if not success:
                         img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
 
             else:
-                # img = Image.fromarray(data)
-                # img.save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level)
-                with open(file, 'wb') as f:
-                    write_png(image, f)
+                img = Image.fromarray(data)
+                img.save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level)
+
 
             results.append({
                 "filename": file,
