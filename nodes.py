@@ -1519,7 +1519,7 @@ class SaveImage:
 
 
                 if metadata is not None:
-                    success, img = pyfpng.encode_image_to_memory(data, 3)
+                    success, img = pyfpng.encode_image_to_memory(data, desired_channels=3)
                     if not success:
                         # data = np.flip(data, axis=-1)  # flip the array along axis -1
                         # data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
@@ -1528,7 +1528,7 @@ class SaveImage:
                         with open(os.path.join(full_output_folder, file), "wb") as f:
                             f.write(add_PngInfo_metadata_to_png_bytestring(img, metadata))
                 else:
-                    success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data, 3)
+                    success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data, desired_channels=3)
                     if not success:
                         # data = np.flip(data, axis=-1)  # flip the array along axis -1
                         # data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
