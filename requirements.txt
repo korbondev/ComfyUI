@@ -19,3 +19,7 @@ numpy
 kornia>=0.7.1
 spandrel
 soundfile
+git+https://github.com/K0lb3/fpng_py.git
+pypng
+#git clone --recurse-submodules https://github.com/qrmt/fpng-python.git
+#python setup.py install

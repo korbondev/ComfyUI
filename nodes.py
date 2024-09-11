@@ -16,6 +16,8 @@ from PIL.PngImagePlugin import PngInfo
 import numpy as np
 import safetensors.torch
 
+from numpy_array_to_fpng import add_metadata, numpy_array_to_fpng
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "comfy"))
 
 import comfy.diffusers_load
@@ -1441,21 +1443,40 @@ class SaveImage:
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         results = list()
-        for (batch_number, image) in enumerate(images):
-            i = 255. * image.cpu().numpy()
-            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
-            metadata = None
-            if not args.disable_metadata:
-                metadata = PngInfo()
-                if prompt is not None:
-                    metadata.add_text("prompt", json.dumps(prompt))
-                if extra_pnginfo is not None:
-                    for x in extra_pnginfo:
-                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
+        for batch_number, image in enumerate(images):
+            i = 255.0 * image.cpu().numpy()
+
+            data = np.clip(i, 0, 255).astype(np.uint8)
 
             filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
             file = f"{filename_with_batch_num}_{counter:05}_.png"
-            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+
+            metadata = None
+            if not args.disable_metadata:
+                if prompt is not None:
+                    metadata = PngInfo()
+                    metadata.add_text("prompt", json.dumps(prompt))
+                if extra_pnginfo is not None:
+                    metadata = PngInfo() if metadata is None else metadata
+                    for x in extra_pnginfo:
+                        metadata.add_text(x, json.dumps(extra_pnginfo[x]))
+
+
+
+            if metadata is not None:
+                success, img = numpy_array_to_fpng(data)
+                if not success:
+                    img = Image.fromarray(data)
+                else:
+                    with open(os.path.join(full_output_folder, file), "wb") as f:
+                        f.write(add_metadata(img, metadata))
+            else:
+                success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
+                if not success:
+                    img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+
+
+
             results.append({
                 "filename": file,
                 "subfolder": subfolder,
@@ -1463,8 +1484,8 @@ class SaveImage:
             })
             counter += 1
 
-        return { "ui": { "images": results } }
-
+        return {"ui": {"images": results}}
+    
 class PreviewImage(SaveImage):
     def __init__(self):
         self.output_dir = folder_paths.get_temp_directory()
