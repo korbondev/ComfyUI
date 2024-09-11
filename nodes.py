@@ -2229,8 +2229,7 @@ def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
                 image_bytes,
                 w,
                 h,
-                num_chans=num_channels,
-                flags=fpng_py.CompressionFlags.NONE,
+                num_channels,
             )
             return True
 
@@ -2238,8 +2237,7 @@ def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
             image_bytes,
             w,
             h,
-            num_chans=num_channels,
-            flags=fpng_py.CompressionFlags.NONE,
+            num_channels,
         )
         success = True
     except Exception as e:
