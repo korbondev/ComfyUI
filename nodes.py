@@ -2241,6 +2241,7 @@ def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
         success = False
         print(f"Error: {e}")
         logging.error(f"Error: {e}")
+        raise
 
 
     return success, output
