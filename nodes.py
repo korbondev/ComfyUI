@@ -1515,13 +1515,13 @@ class SaveImage:
 
                 if metadata is not None:
                     # Measure execution time of numpy_array_to_fpng
-                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8)), number=1000)
-                    logging.info(f"numpy_array_to_fpng execution time: {numpy_array_to_fpng_time:.6f} milliseconds each")
+                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8)), number=100)
+                    logging.info(f"numpy_array_to_fpng execution time: {(numpy_array_to_fpng_time * 10):.6f} milliseconds each")
 
                     # Measure execution time of img.save
                     # img = Image.fromarray(data)
-                    img_save_time = timeit.timeit(lambda: Image.fromarray(np.clip(deepcopy(i), 0, 255).astype(np.uint8)).save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level), number=1000)
-                    logging.info(f"img.save execution time: {img_save_time:.6f} milliseconds each")
+                    img_save_time = timeit.timeit(lambda: Image.fromarray(np.clip(deepcopy(i), 0, 255).astype(np.uint8)).save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level), number=100)
+                    logging.info(f"img.save execution time: {(img_save_time * 10):.6f} milliseconds each")
 
                     success, img = numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8))
                     if not success:
@@ -1531,15 +1531,15 @@ class SaveImage:
                             f.write(add_metadata(img, metadata))
                 else:
                     # Measure execution time of numpy_array_to_fpng
-                    logging.info(f"Measuring execution time for {os.path.join(full_output_folder, file)} with numpy_array_to_fpng function 1000 times (could take a while...)")
-                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8), filename=os.path.join(full_output_folder, file)), number=1000)
-                    logging.info(f"numpy_array_to_fpng execution time: {numpy_array_to_fpng_time:.6f} milliseconds each")
+                    logging.info(f"Measuring execution time for {os.path.join(full_output_folder, file)} with numpy_array_to_fpng function 100 times (could take a while...)")
+                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8), filename=os.path.join(full_output_folder, file)), number=100)
+                    logging.info(f"numpy_array_to_fpng execution time: {(numpy_array_to_fpng_time * 10):.6f} milliseconds each")
                     
                     # Measure execution time of img.save
                     # img = Image.fromarray(deepcopy(data))
-                    img_save_time = timeit.timeit(lambda: Image.fromarray(np.clip(deepcopy(i), 0, 255).astype(np.uint8)).save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level), number=1000)
-                    logging.info(f"Measuring execution time for {os.path.join(full_output_folder, file)} with PIL/Pillow fromarray(np) and Image.save() 1000 times (could take a while...)")
-                    logging.info(f"img.save execution time: {img_save_time:.6f} milliseconds each")
+                    img_save_time = timeit.timeit(lambda: Image.fromarray(np.clip(deepcopy(i), 0, 255).astype(np.uint8)).save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level), number=100)
+                    logging.info(f"Measuring execution time for {os.path.join(full_output_folder, file)} with PIL/Pillow fromarray(np) and Image.save() 100 times (could take a while...)")
+                    logging.info(f"img.save execution time: {(img_save_time * 10):.6f} milliseconds each")
 
                     success = numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8), filename=os.path.join(full_output_folder, file))
                     if not success:
