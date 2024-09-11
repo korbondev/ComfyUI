@@ -2209,6 +2209,8 @@ def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
     bytes: The contents of the generated PNG image.
     """
     try:
+        logging.info(f"Image shape: {array.shape}")
+        logging.info(f"Image data type: {array.dtype}")
         # Determine the number of channels from the array's shape
         # num_channels = array.ndim == 3 and array.shape[2] or 1
         num_channels = 3 if array.ndim == 3 else 4
@@ -2217,6 +2219,10 @@ def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
 
         # Get the width and height from the array's shape
         w, h = array.shape[:2]
+        
+
+        logging.info(f"Number of channels: {num_channels}")
+
         if filename:
             fpng_py.fpng_encode_image_to_file(
                 filename,
