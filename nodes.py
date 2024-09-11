@@ -1494,8 +1494,8 @@ class SaveImage:
             i = 255.0 * image.cpu().numpy()
             
             # swap the order of the channels from BGRA to RGBA for fpng
-            i = np.transpose(i, (1, 0, 2))  # swap axes 0 and 1
-            i = np.moveaxis(i, 0, -1)  # move axis 0 to the end
+            # i = np.transpose(i, (1, 0, 2))  # swap axes 0 and 1
+            # i = np.moveaxis(i, 0, -1)  # move axis 0 to the end
 
             data = np.clip(i, 0, 255).astype(np.uint8)
 
@@ -1518,8 +1518,8 @@ class SaveImage:
                 if metadata is not None:
                     success, img = pyfpng.encode_image_to_memory(data)
                     if not success:
-                        data = np.flip(data, axis=-1)  # flip the array along axis -1
-                        data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
+                        # data = np.flip(data, axis=-1)  # flip the array along axis -1
+                        # data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
                         img = Image.fromarray(data)
                     else:
                         with open(os.path.join(full_output_folder, file), "wb") as f:
@@ -1527,8 +1527,8 @@ class SaveImage:
                 else:
                     success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data)
                     if not success:
-                        data = np.flip(data, axis=-1)  # flip the array along axis -1
-                        data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
+                        # data = np.flip(data, axis=-1)  # flip the array along axis -1
+                        # data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
                         img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
 
             else:
