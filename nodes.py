@@ -2178,7 +2178,7 @@ for i in range(256):
     CRC_TABLE.append(crc)
 
 def add_PngInfo_metadata_to_png_bytestring(png_bytestring:bytes, metadata:PngInfo):
-    return png_bytestring
+    # return png_bytestring
     chunks = []
     for chunk in metadata.chunks:
         chunk_type = chunk[0]
