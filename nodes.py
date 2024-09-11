@@ -1494,8 +1494,8 @@ class SaveImage:
             i = 255.0 * image.cpu().numpy()
             
             # swap the order of the channels from BGRA to RGBA for fpng
-            data = np.transpose(data, (1, 0, 2))  # swap axes 0 and 1
-            data = np.moveaxis(data, 0, -1)  # move axis 0 to the end
+            i = np.transpose(i, (1, 0, 2))  # swap axes 0 and 1
+            i = np.moveaxis(i, 0, -1)  # move axis 0 to the end
 
             data = np.clip(i, 0, 255).astype(np.uint8)
 
