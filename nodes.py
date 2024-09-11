@@ -1499,6 +1499,8 @@ class SaveImage:
 
             data = np.clip(i, 0, 255).astype(np.uint8)
 
+            data = np.moveaxis(data, 3, 0)  # move the alpha channel to the beginning
+
             filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
             file = f"{filename_with_batch_num}_{counter:05}_.png"
 
