@@ -1502,7 +1502,7 @@ class SaveImage:
             from copy import deepcopy
             import timeit
 
-            data = np.clip(i, 0, 255).astype(np.uint8)
+            # data = np.clip(i, 0, 255).astype(np.uint8)
 
             
 
@@ -1515,31 +1515,33 @@ class SaveImage:
 
                 if metadata is not None:
                     # Measure execution time of numpy_array_to_fpng
-                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(deepcopy(data)), number=1000)
-                    logging.info(f"numpy_array_to_fpng execution time: {numpy_array_to_fpng_time:.6f} seconds")
+                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8)), number=1000)
+                    logging.info(f"numpy_array_to_fpng execution time: {numpy_array_to_fpng_time:.6f} milliseconds each")
 
                     # Measure execution time of img.save
                     # img = Image.fromarray(data)
-                    img_save_time = timeit.timeit(lambda: Image.fromarray(data).save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level), number=1000)
-                    logging.info(f"img.save execution time: {img_save_time:.6f} seconds")
+                    img_save_time = timeit.timeit(lambda: Image.fromarray(np.clip(deepcopy(i), 0, 255).astype(np.uint8)).save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level), number=1000)
+                    logging.info(f"img.save execution time: {img_save_time:.6f} milliseconds each")
 
-                    success, img = numpy_array_to_fpng(data)
+                    success, img = numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8))
                     if not success:
-                        img = Image.fromarray(data)
+                        img = Image.fromarray(np.clip(deepcopy(i), 0, 255).astype(np.uint8))
                     else:
                         with open(os.path.join(full_output_folder, file), "wb") as f:
                             f.write(add_metadata(img, metadata))
                 else:
                     # Measure execution time of numpy_array_to_fpng
-                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(deepcopy(data), filename=os.path.join(full_output_folder, file)), number=1000)
-                    logging.info(f"numpy_array_to_fpng execution time: {numpy_array_to_fpng_time:.6f} seconds")
+                    logging.info(f"Measuring execution time for {os.path.join(full_output_folder, file)} with numpy_array_to_fpng function 1000 times (could take a while...)")
+                    numpy_array_to_fpng_time = timeit.timeit(lambda: numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8), filename=os.path.join(full_output_folder, file)), number=1000)
+                    logging.info(f"numpy_array_to_fpng execution time: {numpy_array_to_fpng_time:.6f} milliseconds each")
                     
                     # Measure execution time of img.save
                     # img = Image.fromarray(deepcopy(data))
-                    img_save_time = timeit.timeit(lambda: Image.fromarray(deepcopy(data)).save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level), number=1000)
-                    logging.info(f"img.save execution time: {img_save_time:.6f} seconds")
+                    img_save_time = timeit.timeit(lambda: Image.fromarray(np.clip(deepcopy(i), 0, 255).astype(np.uint8)).save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level), number=1000)
+                    logging.info(f"Measuring execution time for {os.path.join(full_output_folder, file)} with PIL/Pillow fromarray(np) and Image.save() 1000 times (could take a while...)")
+                    logging.info(f"img.save execution time: {img_save_time:.6f} milliseconds each")
 
-                    success = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
+                    success = numpy_array_to_fpng(np.clip(deepcopy(i), 0, 255).astype(np.uint8), filename=os.path.join(full_output_folder, file))
                     if not success:
                         img.save(os.path.join(full_output_folder, file), pnginfo=None, compress_level=self.compress_level)
             else:
@@ -2200,8 +2202,8 @@ def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
     bytes: The contents of the generated PNG image.
     """
     try:
-        logging.info(f"Image shape: {array.shape}")
-        logging.info(f"Image data type: {array.dtype}")
+        # logging.info(f"Image shape: {array.shape}")
+        # logging.info(f"Image data type: {array.dtype}")
         # Determine the number of channels from the array's shape
         # num_channels = array.ndim == 3 and array.shape[2] or 1
         num_channels = 3 if array.ndim == 3 else 4
@@ -2212,7 +2214,7 @@ def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
         w, h = array.shape[:2]
         
 
-        logging.info(f"Number of channels: {num_channels}")
+        # logging.info(f"Number of channels: {num_channels}")
 
         if filename:
             fpng_py.fpng_encode_image_to_file(
