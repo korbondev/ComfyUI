@@ -18,6 +18,7 @@ from io import BytesIO
 
 import pyfpng  # https://github.com/qrmt/fpng-python # has to be installed directly from c++ using setup.py install
 # import png  # pip install pypng
+import fpng_py 
 
 
 import numpy as np
@@ -1519,7 +1520,8 @@ class SaveImage:
 
 
                 if metadata is not None:
-                    success, img = pyfpng.encode_image_to_memory(data, desired_channels=3)
+                    # success, img = pyfpng.encode_image_to_memory(data)
+                    success, img = numpy_array_to_fpng(data)
                     if not success:
                         # data = np.flip(data, axis=-1)  # flip the array along axis -1
                         # data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
@@ -1528,7 +1530,8 @@ class SaveImage:
                         with open(os.path.join(full_output_folder, file), "wb") as f:
                             f.write(add_PngInfo_metadata_to_png_bytestring(img, metadata))
                 else:
-                    success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data, desired_channels=3)
+                    success = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
+                    # success = pyfpng.encode_image_to_file(os.path.join(full_output_folder, file), data)
                     if not success:
                         # data = np.flip(data, axis=-1)  # flip the array along axis -1
                         # data = np.moveaxis(data, -1, 0)  # move axis -1 to the beginning
@@ -2192,3 +2195,52 @@ def add_PngInfo_metadata_to_png_bytestring(png_bytestring:bytes, metadata:PngInf
     modified_png_data.write(b''.join(chunks))
     modified_png_data.write(png_bytestring[21:])
     return modified_png_data.getvalue()
+
+
+
+def numpy_array_to_fpng(array: np.ndarray, filename:str="") -> bytes:
+    """
+    Convert a NumPy array to a PNG image using fpng_py -> fpng.cpp.
+
+    Parameters:
+    array (np.ndarray): The input NumPy array containing image data.
+
+    Returns:
+    bytes: The contents of the generated PNG image.
+    """
+    try:
+        # Determine the number of channels from the array's shape
+        # num_channels = array.ndim == 3 and array.shape[2] or 1
+        num_channels = 3 if array.ndim == 3 else 4
+        # Convert the array to a bytes string
+        image_bytes = array.tobytes()
+
+        # Get the width and height from the array's shape
+        w, h = array.shape[:2]
+        if filename:
+            fpng_py.fpng_encode_image_to_file(
+                filename,
+                image_bytes,
+                w,
+                h,
+                num_chans=num_channels,
+                flags=fpng_py.CompressionFlags.NONE,
+            )
+            return True
+
+        output = fpng_py.fpng_encode_image_to_memory(
+            image_bytes,
+            w,
+            h,
+            num_chans=num_channels,
+            flags=fpng_py.CompressionFlags.NONE,
+        )
+        success = True
+    except Exception as e:
+        output = None
+        success = False
+        print(f"Error: {e}")
+        logging.error(f"Error: {e}")
+
+
+    return success, output
