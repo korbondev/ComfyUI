@@ -1422,7 +1422,7 @@ class SaveImage:
         self.output_dir = folder_paths.get_output_directory()
         self.type = "output"
         self.prefix_append = ""
-        self.compress_level = 1
+        self.compress_level = 4
 
     @classmethod
     def INPUT_TYPES(s):
@@ -1440,9 +1440,49 @@ class SaveImage:
     CATEGORY = "image"
 
     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
+        results = list()
+
+        if "COMFY_SAVE_IMAGE" in os.environ:
+            filename = os.environ["COMFY_SAVE_IMAGE"]
+
+            # Take the first image in the batch
+            i = 255.0 * images[0].cpu().numpy()
+            data = np.clip(i, 0, 255).astype(np.uint8)
+
+            # Ensure the filename has an extension
+            base, ext = os.path.splitext(filename)
+            if not ext:
+                ext = '.png'  # Default extension if none is provided
+                filename += ext
+
+            # Create a temporary filename with .tmp suffix
+            temp_filename = base + '.tmp'
+
+            # Save the image to the temporary file
+            success, img = numpy_array_to_fpng(data, filename=temp_filename)
+            if not success:
+                img.save(temp_filename, pnginfo=None, compress_level=1)
+
+            # Replace the temporary file with the final filename
+            os.replace(temp_filename, filename)
+
+            # Extract the subfolder from the filename
+            dir_name = os.path.dirname(filename)
+            subfolder = os.path.basename(dir_name) if dir_name else ''
+
+            results.append({
+                "filename": filename,
+                "subfolder": subfolder,
+                "type": self.type
+            })
+            counter = 1
+
+            return {"ui": {"images": results}}
+
+
+
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
-        results = list()
         for batch_number, image in enumerate(images):
             i = 255.0 * image.cpu().numpy()
 
