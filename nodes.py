@@ -1422,7 +1422,7 @@ class SaveImage:
         self.output_dir = folder_paths.get_output_directory()
         self.type = "output"
         self.prefix_append = ""
-        self.compress_level = 4
+        self.compress_level = 1
 
     @classmethod
     def INPUT_TYPES(s):
