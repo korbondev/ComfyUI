@@ -1456,7 +1456,7 @@ class SaveImage:
                 # Sanitize the filename to prevent security issues
                 suggested_filename = os.path.basename(suggested_filename)
                 # verbose
-                print(f"Using suggested filename: {suggested_filename}")
+                #print(f"Using suggested filename: {suggested_filename}")
 
         for batch_number, image in enumerate(images):
             i = 255.0 * image.cpu().numpy()
