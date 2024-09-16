@@ -1440,50 +1440,9 @@ class SaveImage:
     CATEGORY = "image"
 
     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
-        results = list()
-
-        if "COMFY_STATIC_IMAGE_FILE" in os.environ:
-            filename = os.environ["COMFY_STATIC_IMAGE_FILE"]
-
-            # Ensure the filename has an extension
-            base, ext = os.path.splitext(filename)
-            if not ext:
-                ext = '.png'  # Default extension if none is provided
-                filename += ext
-
-            # Create a temporary filename with .tmp suffix
-            temp_filename = base + '_tmp.png'
-
-            for batch_number, image in enumerate(images):
-                i = 255.0 * image.cpu().numpy()
-                data = np.clip(i, 0, 255).astype(np.uint8)
-
-                # Save the image to the temporary file
-                print(f"Saving image to {temp_filename}")
-                success, img = numpy_array_to_fpng(data, filename=temp_filename)
-                if not success:
-                    img.save(temp_filename, pnginfo=None, compress_level=1)
-
-                # Replace the temporary file with the final filename
-                print(f"Renaming {temp_filename} to {filename}")
-                os.replace(temp_filename, filename)
-
-                # Extract the subfolder from the filename
-                dir_name = os.path.dirname(filename)
-                subfolder = os.path.basename(dir_name) if dir_name else ''
-
-                results.append({
-                    "filename": filename,
-                    "subfolder": subfolder,
-                    "type": self.type
-                })
-
-            return {"ui": {"images": results}}
-
-
-
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
+        results = list()
         for batch_number, image in enumerate(images):
             i = 255.0 * image.cpu().numpy()
 
