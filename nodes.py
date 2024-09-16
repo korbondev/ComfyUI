@@ -1489,13 +1489,13 @@ class SaveImage:
                     print("Failed to save image with fpng, we we can add_metadata()")
                     img = Image.fromarray(data)
                 else:
-                    with open(os.path.join(full_output_folder, temp_file), "wb") as f:
+                    with open(temp_file, "wb") as f:
                         f.write(add_metadata(img, metadata))
             else:
-                success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, temp_file))
+                success, img = numpy_array_to_fpng(data, filename=temp_file)
                 if not success:
                     print("Failed to save image with fpng, using img.save() ")
-                    img.save(os.path.join(full_output_folder, temp_file), pnginfo=metadata, compress_level=self.compress_level)
+                    img.save(temp_file, pnginfo=metadata, compress_level=self.compress_level)
             
             # rename the temp file to the final file
             os.rename(temp_file, file)
