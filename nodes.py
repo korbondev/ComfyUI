@@ -1443,14 +1443,10 @@ class SaveImage:
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         results = list()
-        dumped_prompt = json.dumps(prompt) if prompt is not None else None
 
         static_filename = None
-        if "COMFY_STATIC_IMAGE_FILE" in os.environ and dumped_prompt is not None:
+        if "COMFY_STATIC_IMAGE_FILE" in os.environ:
             static_filename = os.path.join(full_output_folder, os.environ["COMFY_STATIC_IMAGE_FILE"])
-            # add the prompt_id to the filename
-            print(dumped_prompt)
-            static_filename = static_filename.replace(".png", f"_{dumped_prompt.prompt_id}.png")
 
         for batch_number, image in enumerate(images):
             i = 255.0 * image.cpu().numpy()
@@ -1464,7 +1460,7 @@ class SaveImage:
             if not args.disable_metadata:
                 if prompt is not None:
                     metadata = PngInfo()
-                    metadata.add_text("prompt", dumped_prompt)
+                    metadata.add_text("prompt", json.dumps(prompt))
                 if extra_pnginfo is not None:
                     metadata = PngInfo() if metadata is None else metadata
                     for x in extra_pnginfo:
@@ -1487,7 +1483,7 @@ class SaveImage:
             if static_filename is not None:
                 os.rename(os.path.join(full_output_folder, file), static_filename)
                 # wait a period of time to allow the file to be captured by the web server
-                time.sleep(3)
+                time.sleep(5)
                 os.rename(static_filename, os.path.join(full_output_folder, file))
                 
 
