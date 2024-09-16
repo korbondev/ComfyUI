@@ -1458,8 +1458,6 @@ class SaveImage:
                 i = 255.0 * image.cpu().numpy()
                 data = np.clip(i, 0, 255).astype(np.uint8)
 
-
-
                 # Save the image to the temporary file
                 print(f"Saving image to {temp_filename}")
                 success, img = numpy_array_to_fpng(data, filename=temp_filename)
