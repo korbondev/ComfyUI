@@ -1482,9 +1482,10 @@ class SaveImage:
 
             if static_filename is not None:
                 os.rename(os.path.join(full_output_folder, file), static_filename)
-                # update file
-                # note: this breaks the history in ComfyUI
-                file = os.path.basename(static_filename)
+                # wait a period of time to allow the file to be captured by the web server
+                time.sleep(3)
+                os.rename(static_filename, os.path.join(full_output_folder, file))
+                
 
             results.append({
                 "filename": file,
