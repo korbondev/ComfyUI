@@ -1480,18 +1480,18 @@ class SaveImage:
                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
             if metadata is not None:
-                success, img = numpy_array_to_fpng(data)
-                if not success:
-                    print("Failed to save image with fpng, we we can add_metadata()")
-                    img = Image.fromarray(data)
-                else:
-                    with open(os.path.join(full_output_folder, file), "wb") as f:
-                        f.write(add_metadata(img, metadata))
+                #success, img = numpy_array_to_fpng(data)
+                #if not success:
+                print("Failed to save image with fpng, we we can add_metadata()")
+                img = Image.fromarray(data)
+                #else:
+                with open(os.path.join(full_output_folder, file), "wb") as f:
+                    f.write(add_metadata(img, metadata))
             else:
-                success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
-                if not success:
-                    print("Failed to save image with fpng, using img.save() ")
-                    img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+                #success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
+                #if not success:
+                    #print("Failed to save image with fpng, using img.save() ")
+                img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
             
             results.append({
                 "filename": file,
