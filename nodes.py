@@ -1456,12 +1456,12 @@ class SaveImage:
                 # Sanitize the filename to prevent security issues
                 suggested_filename = os.path.basename(suggested_filename)
                 # verbose
-                #print(f"Using suggested filename: {suggested_filename}")
+                print(f"Using suggested filename: {suggested_filename}")
 
         for batch_number, image in enumerate(images):
-            # i = 255.0 * image.cpu().numpy()
+            i = 255.0 * image.cpu().numpy()
 
-            # data = np.clip(i, 0, 255).astype(np.uint8)
+            data = np.clip(i, 0, 255).astype(np.uint8)
             
             if suggested_filename is not None:
                 file = suggested_filename
@@ -1469,44 +1469,31 @@ class SaveImage:
                 filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
                 file = f"{filename_with_batch_num}_{counter:05}_.png"
 
-            # metadata = None
-            # if not args.disable_metadata:
-            #     if prompt is not None:
-            #         metadata = PngInfo()
-            #         metadata.add_text("prompt", json.dumps(prompt))
-            #     if extra_pnginfo is not None:
-            #         metadata = PngInfo() if metadata is None else metadata
-            #         for x in extra_pnginfo:
-            #             metadata.add_text(x, json.dumps(extra_pnginfo[x]))
-            
-            i = 255. * image.cpu().numpy()
-            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            file = os.path.join(full_output_folder, file)
+
             metadata = None
             if not args.disable_metadata:
-                metadata = PngInfo()
                 if prompt is not None:
+                    metadata = PngInfo()
                     metadata.add_text("prompt", json.dumps(prompt))
                 if extra_pnginfo is not None:
+                    metadata = PngInfo() if metadata is None else metadata
                     for x in extra_pnginfo:
                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
-            # filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            # file = f"{filename_with_batch_num}_{counter:05}_.png"
-            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
-
-            # if metadata is not None:
-            #     success, img = numpy_array_to_fpng(data)
-            #     if not success:
-            #         print("Failed to save image with fpng, we we can add_metadata()")
-            #         img = Image.fromarray(data)
-            #     else:
-            #         with open(os.path.join(full_output_folder, file), "wb") as f:
-            #             f.write(add_metadata(img, metadata))
-            # else:
-            #     success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
-            #     if not success:
-            #         print("Failed to save image with fpng, using img.save() ")
-            #         img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+            if metadata is not None:
+                success, img = numpy_array_to_fpng(data)
+                if not success:
+                    print("Failed to save image with fpng, we we can add_metadata()")
+                    img = Image.fromarray(data)
+                else:
+                    with open(os.path.join(full_output_folder, file), "wb") as f:
+                        f.write(add_metadata(img, metadata))
+            else:
+                success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
+                if not success:
+                    print("Failed to save image with fpng, using img.save() ")
+                    img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
             
             results.append({
                 "filename": file,
