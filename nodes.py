@@ -1443,6 +1443,11 @@ class SaveImage:
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         results = list()
+
+        static_filename = None
+        if "COMFY_STATIC_IMAGE_FILE" in os.environ:
+            static_filename = os.path.join(full_output_folder, os.environ["COMFY_STATIC_IMAGE_FILE"])
+
         for batch_number, image in enumerate(images):
             i = 255.0 * image.cpu().numpy()
 
@@ -1475,12 +1480,10 @@ class SaveImage:
                 if not success:
                     img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
 
-            if "COMFY_STATIC_IMAGE_FILE" in os.environ:
-                static_filename = os.environ["COMFY_STATIC_IMAGE_FILE"]
-                # rename file using static_filename
-                static_filename = os.path.join(full_output_folder, static_filename)
+            if static_filename is not None:
                 os.rename(os.path.join(full_output_folder, file), static_filename)
-                file = static_filename
+                # update file
+                file = os.path.basename(static_filename)
 
             results.append({
                 "filename": file,
