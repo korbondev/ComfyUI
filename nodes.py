@@ -1444,6 +1444,8 @@ class SaveImage:
         # Extract the suggested filename from the prompt's '_meta' field
         suggested_filename = None
 
+        print(prompt)
+
         if prompt and "Prompt" in prompt:
             # Ensure '_meta' exists
             if "_meta" in prompt["Prompt"]:
