@@ -1475,7 +1475,12 @@ class SaveImage:
                 if not success:
                     img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
 
-
+            if "COMFY_STATIC_IMAGE_FILE" in os.environ:
+                static_filename = os.environ["COMFY_STATIC_IMAGE_FILE"]
+                # rename file using static_filename
+                static_filename = os.path.join(full_output_folder, static_filename)
+                os.rename(os.path.join(full_output_folder, file), static_filename)
+                file = static_filename
 
             results.append({
                 "filename": file,
