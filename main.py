@@ -122,7 +122,7 @@ def prompt_worker(q, server):
             e.execute(item[2], prompt_id, item[3], item[4])
             if not e.success:
                 for sm in e.status_messages:                    
-                    logging.info(f"{sm}")
+                    #logging.info(f"{sm}")
                     if "No face detected" in f"{sm}":
                         prompt = item[2]
                         #logging.info(f"Prompt: {prompt}")
@@ -135,6 +135,8 @@ def prompt_worker(q, server):
                                 logging.info(f"Making input: 'init-instantid.png' the output: '{suggested_filename}'")                                
                                 input_dir = folder_paths.get_input_directory()
                                 temp_dir = folder_paths.get_temp_directory()
+                                
+                                os.makedirs(temp_dir, exist_ok=True)
                                 os.rename(os.path.join(input_dir, 'init-instantid.png'), os.path.join(temp_dir, suggested_filename))
                                 logging.info(f"File moved: {os.path.isfile(os.path.join(temp_dir, suggested_filename))}")
 
