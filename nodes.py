@@ -1445,10 +1445,6 @@ class SaveImage:
         if "COMFY_STATIC_IMAGE_FILE" in os.environ:
             filename = os.environ["COMFY_STATIC_IMAGE_FILE"]
 
-            # Take the first image in the batch
-            i = 255.0 * images[0].cpu().numpy()
-            data = np.clip(i, 0, 255).astype(np.uint8)
-
             # Ensure the filename has an extension
             base, ext = os.path.splitext(filename)
             if not ext:
@@ -1458,25 +1454,31 @@ class SaveImage:
             # Create a temporary filename with .tmp suffix
             temp_filename = base + '.tmp'
 
-            # Save the image to the temporary file
-            print(f"Saving image to {temp_filename}")
-            success, img = numpy_array_to_fpng(data, filename=temp_filename)
-            if not success:
-                img.save(temp_filename, pnginfo=None, compress_level=1)
+            for batch_number, image in enumerate(images):
+                i = 255.0 * image.cpu().numpy()
+                data = np.clip(i, 0, 255).astype(np.uint8)
 
-            # Replace the temporary file with the final filename
-            os.replace(temp_filename, filename)
 
-            # Extract the subfolder from the filename
-            dir_name = os.path.dirname(filename)
-            subfolder = os.path.basename(dir_name) if dir_name else ''
 
-            results.append({
-                "filename": filename,
-                "subfolder": subfolder,
-                "type": self.type
-            })
-            counter = 1
+                # Save the image to the temporary file
+                print(f"Saving image to {temp_filename}")
+                success, img = numpy_array_to_fpng(data, filename=temp_filename)
+                if not success:
+                    img.save(temp_filename, pnginfo=None, compress_level=1)
+
+                # Replace the temporary file with the final filename
+                print(f"Renaming {temp_filename} to {filename}")
+                os.replace(temp_filename, filename)
+
+                # Extract the subfolder from the filename
+                dir_name = os.path.dirname(filename)
+                subfolder = os.path.basename(dir_name) if dir_name else ''
+
+                results.append({
+                    "filename": filename,
+                    "subfolder": subfolder,
+                    "type": self.type
+                })
 
             return {"ui": {"images": results}}
 
