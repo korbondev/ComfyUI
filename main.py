@@ -121,11 +121,9 @@ def prompt_worker(q, server):
 
             e.execute(item[2], prompt_id, item[3], item[4])
             if not e.success:
-                for sm in e.status_messages:
+                for sm in e.status_messages:                    
                     logging.info(f"{sm}")
-                    #continue
-                    em = dict(dict(sm).get("execution_error", {})).get("exception_message", "")
-                    if "Reference Image: No face detected" in em:
+                    if "No face detected" in f"{sm}":
                         logging.info("BLAH BLAH BLAH NO FACE OK THANKS!")
 
             need_gc = True
