@@ -124,21 +124,19 @@ def prompt_worker(q, server):
                 for sm in e.status_messages:                    
                     logging.info(f"{sm}")
                     if "No face detected" in f"{sm}":
-                        logging.info("BLAH BLAH BLAH NO FACE OK THANKS!")
                         prompt = item[2]
-                        logging.info(f"Prompt: {prompt}")
+                        #logging.info(f"Prompt: {prompt}")
                         if prompt and 'Prompt' in prompt:
                             prompt_node = prompt['Prompt']
                             if '_meta' in prompt_node and 'suggested_filename' in prompt_node['_meta']:
                                 suggested_filename = prompt_node['_meta']['suggested_filename']
-                                # Sanitize the filename to prevent security issues
-                                suggested_filename = os.path.basename(suggested_filename)
-                                # verbose
-                                logging.info(f"Using suggested filename: {suggested_filename}")
-                                # rename input file
+                                suggested_filename = os.path.basename(suggested_filename)                                
+                                
+                                logging.info(f"Making input: 'init-instantid.png' the output: '{suggested_filename}'")                                
                                 input_dir = folder_paths.get_input_directory()
                                 temp_dir = folder_paths.get_temp_directory()
-                                # os.rename(input_file, os.path.join(output_dir, suggested_filename))
+                                os.rename(os.path.join(input_dir, 'init-instantid.png'), os.path.join(temp_dir, suggested_filename))
+                                logging.info(f"File moved: {os.path.isfile(os.path.join(temp_dir, suggested_filename))}")
 
             need_gc = True
             q.task_done(item_id,
