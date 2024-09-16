@@ -1440,21 +1440,36 @@ class SaveImage:
     CATEGORY = "image"
 
     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
-        filename_prefix += self.prefix_append
-        full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
+        # Extract the suggested filename from the prompt
+        suggested_filename = None
+        if prompt and 'filename' in prompt:
+            suggested_filename = prompt['filename']
+            # Sanitize the filename to prevent security issues
+            suggested_filename = os.path.basename(suggested_filename)
+        
+        # Use the output directory specified
+        full_output_folder = self.output_dir
         results = list()
-
-        static_filename = None
-        if "COMFY_STATIC_IMAGE_FILE" in os.environ:
-            static_filename = os.path.join(full_output_folder, os.environ["COMFY_STATIC_IMAGE_FILE"])
+        counter = 0  # Initialize counter if needed
 
         for batch_number, image in enumerate(images):
             i = 255.0 * image.cpu().numpy()
-
             data = np.clip(i, 0, 255).astype(np.uint8)
 
-            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.png"
+            # Determine the filename to use
+            if suggested_filename:
+                file = suggested_filename
+            else:
+                # Use the default filename construction
+                filename_prefix += self.prefix_append
+                _, filename, _, _, _ = folder_paths.get_save_image_path(
+                    filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0]
+                )
+                filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+                file = f"{filename_with_batch_num}_{counter:05}_.png"
+
+            # Proceed with saving the image
+            file_path = os.path.join(full_output_folder, file)
 
             metadata = None
             if not args.disable_metadata:
@@ -1466,35 +1481,32 @@ class SaveImage:
                     for x in extra_pnginfo:
                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
+            # Save the image
             if metadata is not None:
                 success, img = numpy_array_to_fpng(data)
                 if not success:
-                    print("Failed to save image with fpng, we we can add_metadata()")
+                    print("Failed to save image with fpng, using Image.fromarray()")
                     img = Image.fromarray(data)
+                    img.save(file_path, pnginfo=metadata, compress_level=self.compress_level)
                 else:
-                    with open(os.path.join(full_output_folder, file), "wb") as f:
+                    with open(file_path, "wb") as f:
                         f.write(add_metadata(img, metadata))
             else:
-                success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
+                success, img = numpy_array_to_fpng(data, filename=file_path)
                 if not success:
-                    print("Failed to save image with fpng, using img.save() ")
-                    img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
-
-            if static_filename is not None:
-                os.rename(os.path.join(full_output_folder, file), static_filename)
-                # wait a period of time to allow the file to be captured by the web server
-                time.sleep(5)
-                os.rename(static_filename, os.path.join(full_output_folder, file))
-                
+                    print("Failed to save image with fpng, using img.save()")
+                    img = Image.fromarray(data)
+                    img.save(file_path, compress_level=self.compress_level)
 
             results.append({
                 "filename": file,
-                "subfolder": subfolder,
+                "subfolder": os.path.basename(full_output_folder),
                 "type": self.type
             })
             counter += 1
 
         return {"ui": {"images": results}}
+
     
 class PreviewImage(SaveImage):
     def __init__(self):
