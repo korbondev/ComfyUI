@@ -132,15 +132,15 @@ def prompt_worker(q, server):
                                 suggested_filename = prompt_node['_meta']['suggested_filename']
                                 suggested_filename = os.path.basename(suggested_filename)                                
                                 
-                                logging.info(f"Making input: 'init-instantid.png' the output: '{suggested_filename}'")                                
-                                input_dir = folder_paths.get_input_directory()
-                                temp_dir = folder_paths.get_temp_directory()
-                                
+                                #logging.info(f"Making input: 'init-instantid.png' the output: '{suggested_filename}'")                                
+                                #input_dir = folder_paths.get_input_directory()
+                                temp_dir = folder_paths.get_temp_directory()                                
                                 os.makedirs(temp_dir, exist_ok=True)
                                 # os.rename(os.path.join(input_dir, 'init-instantid.png'), os.path.join(temp_dir, suggested_filename))
                                 # logging.info(f"File moved: {os.path.isfile(os.path.join(temp_dir, suggested_filename))}")
                                 
                                 # write an empty file in the suggested_filename
+                                logging.info(f"Writing an empty PNG to: '{suggested_filename}'")  
                                 with open(os.path.join(temp_dir, suggested_filename), 'wb') as f:
                                     f.write(b'')
                                 
