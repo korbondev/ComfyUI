@@ -137,8 +137,13 @@ def prompt_worker(q, server):
                                 temp_dir = folder_paths.get_temp_directory()
                                 
                                 os.makedirs(temp_dir, exist_ok=True)
-                                os.rename(os.path.join(input_dir, 'init-instantid.png'), os.path.join(temp_dir, suggested_filename))
-                                logging.info(f"File moved: {os.path.isfile(os.path.join(temp_dir, suggested_filename))}")
+                                # os.rename(os.path.join(input_dir, 'init-instantid.png'), os.path.join(temp_dir, suggested_filename))
+                                # logging.info(f"File moved: {os.path.isfile(os.path.join(temp_dir, suggested_filename))}")
+                                
+                                # write an empty file in the suggested_filename
+                                with open(os.path.join(temp_dir, suggested_filename), 'wb') as f:
+                                    f.write(b'')
+                                
 
             need_gc = True
             q.task_done(item_id,
