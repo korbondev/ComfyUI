@@ -1486,15 +1486,17 @@ class SaveImage:
             if metadata is not None:
                 success, img = numpy_array_to_fpng(data)
                 if not success:
-                    print("Failed to save image with fpng, we we can add_metadata()")
+                    print("Failed to save image with fpng, use PIL (with metadata)")
                     img = Image.fromarray(data)
+                    img.save(temp_file, pnginfo=metadata, compress_level=self.compress_level)
                 else:
                     with open(temp_file, "wb") as f:
                         f.write(add_metadata(img, metadata))
             else:
                 success, img = numpy_array_to_fpng(data, filename=temp_file)
                 if not success:
-                    print("Failed to save image with fpng, using img.save() ")
+                    print("Failed to save image with fpng, use PIL (no metadata)")
+                    img = Image.fromarray(data)
                     img.save(temp_file, pnginfo=metadata, compress_level=self.compress_level)
             
             # rename the temp file to the final file
