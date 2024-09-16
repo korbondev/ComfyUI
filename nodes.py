@@ -1470,6 +1470,8 @@ class SaveImage:
                 file = f"{filename_with_batch_num}_{counter:05}_.png"
 
             file = os.path.join(full_output_folder, file)
+            # make a temporary file path to do the work
+            temp_file = file + ".tmp"
 
             metadata = None
             if not args.disable_metadata:
@@ -1487,14 +1489,17 @@ class SaveImage:
                     print("Failed to save image with fpng, we we can add_metadata()")
                     img = Image.fromarray(data)
                 else:
-                    with open(os.path.join(full_output_folder, file), "wb") as f:
+                    with open(os.path.join(full_output_folder, temp_file), "wb") as f:
                         f.write(add_metadata(img, metadata))
             else:
-                success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
+                success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, temp_file))
                 if not success:
                     print("Failed to save image with fpng, using img.save() ")
-                    img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+                    img.save(os.path.join(full_output_folder, temp_file), pnginfo=metadata, compress_level=self.compress_level)
             
+            # rename the temp file to the final file
+            os.rename(temp_file, file)
+
             results.append({
                 "filename": file,
                 "subfolder": subfolder,
