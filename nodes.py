@@ -1442,8 +1442,8 @@ class SaveImage:
     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
         results = list()
 
-        if "COMFY_SAVE_IMAGE" in os.environ:
-            filename = os.environ["COMFY_SAVE_IMAGE"]
+        if "COMFY_STATIC_IMAGE_FILE" in os.environ:
+            filename = os.environ["COMFY_STATIC_IMAGE_FILE"]
 
             # Take the first image in the batch
             i = 255.0 * images[0].cpu().numpy()
