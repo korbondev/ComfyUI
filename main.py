@@ -126,6 +126,7 @@ def prompt_worker(q, server):
                     if "No face detected" in f"{sm}":
                         logging.info("BLAH BLAH BLAH NO FACE OK THANKS!")
                         prompt = item[2]
+                        logging.info(f"Prompt: {prompt}")
                         if prompt and 'Prompt' in prompt:
                             prompt_node = prompt['Prompt']
                             if '_meta' in prompt_node and 'suggested_filename' in prompt_node['_meta']:
@@ -134,6 +135,10 @@ def prompt_worker(q, server):
                                 suggested_filename = os.path.basename(suggested_filename)
                                 # verbose
                                 logging.info(f"Using suggested filename: {suggested_filename}")
+                                # rename input file
+                                input_dir = folder_paths.get_input_directory()
+                                temp_dir = folder_paths.get_temp_directory()
+                                # os.rename(input_file, os.path.join(output_dir, suggested_filename))
 
             need_gc = True
             q.task_done(item_id,
