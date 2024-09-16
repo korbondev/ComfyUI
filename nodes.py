@@ -1501,7 +1501,7 @@ class SaveImage:
             
             # rename the temp file to the final file
             os.rename(temp_file, file)
-            print(f"Saved image to {file} from batch {batch_number}")
+            #print(f"Saved image to {file} from batch {batch_number}")
 
             results.append({
                 "filename": file,
