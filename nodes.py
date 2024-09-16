@@ -1452,7 +1452,7 @@ class SaveImage:
                 filename += ext
 
             # Create a temporary filename with .tmp suffix
-            temp_filename = base + '.tmp'
+            temp_filename = base + '_tmp.png'
 
             for batch_number, image in enumerate(images):
                 i = 255.0 * image.cpu().numpy()
