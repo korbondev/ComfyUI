@@ -123,8 +123,8 @@ def prompt_worker(q, server):
             if not e.success:
                 for sm in e.status_messages:
                     logging.info(f"{sm}")
-                    continue
-                    em = sm.get("execution_error", {}).get("exception_message", "")
+                    #continue
+                    em = dict(dict(sm).get("execution_error", {})).get("exception_message", "")
                     if "Reference Image: No face detected" in em:
                         logging.info("BLAH BLAH BLAH NO FACE OK THANKS!")
 
