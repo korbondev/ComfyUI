@@ -1,4 +1,5 @@
 import comfy.options
+
 comfy.options.enable_args_parsing()
 
 import os
@@ -48,6 +49,7 @@ def execute_prestartup_script():
             print("{:6.1f} seconds{}:".format(n[0], import_message), n[1])
         print()
 
+
 execute_prestartup_script()
 
 
@@ -61,16 +63,18 @@ import gc
 import logging
 
 if os.name == "nt":
-    logging.getLogger("xformers").addFilter(lambda record: 'A matching Triton is not available' not in record.getMessage())
+    logging.getLogger("xformers").addFilter(
+        lambda record: "A matching Triton is not available" not in record.getMessage()
+    )
 
 if __name__ == "__main__":
     if args.cuda_device is not None:
-        os.environ['CUDA_VISIBLE_DEVICES'] = str(args.cuda_device)
+        os.environ["CUDA_VISIBLE_DEVICES"] = str(args.cuda_device)
         logging.info("Set cuda device to: {}".format(args.cuda_device))
 
     if args.deterministic:
-        if 'CUBLAS_WORKSPACE_CONFIG' not in os.environ:
-            os.environ['CUBLAS_WORKSPACE_CONFIG'] = ":4096:8"
+        if "CUBLAS_WORKSPACE_CONFIG" not in os.environ:
+            os.environ["CUBLAS_WORKSPACE_CONFIG"] = ":4096:8"
 
     import cuda_malloc
 
@@ -89,6 +93,7 @@ from server import BinaryEventTypes
 import nodes
 import comfy.model_management
 
+
 def cuda_malloc_warning():
     device = comfy.model_management.get_torch_device()
     device_name = comfy.model_management.get_torch_device_name(device)
@@ -98,7 +103,10 @@ def cuda_malloc_warning():
             if b in device_name:
                 cuda_malloc_warning = True
         if cuda_malloc_warning:
-            logging.warning("\nWARNING: this card most likely does not support cuda-malloc, if you get \"CUDA error\" please run ComfyUI with: --disable-cuda-malloc\n")
+            logging.warning(
+                '\nWARNING: this card most likely does not support cuda-malloc, if you get "CUDA error" please run ComfyUI with: --disable-cuda-malloc\n'
+            )
+
 
 def prompt_worker(q, server):
     e = execution.PromptExecutor(server)
@@ -109,6 +117,7 @@ def prompt_worker(q, server):
     while True:
         timeout = 1000.0
         if need_gc:
+            current_time = time.perf_counter()
             timeout = max(gc_collect_interval - (current_time - last_gc_collect), 0.0)
 
         queue_item = q.get(timeout=timeout)
@@ -120,14 +129,15 @@ def prompt_worker(q, server):
 
             e.execute(item[2], prompt_id, item[3], item[4])
             need_gc = True
-            q.task_done(item_id,
-                        e.outputs_ui,
-                        status=execution.PromptQueue.ExecutionStatus(
-                            status_str='success' if e.success else 'error',
-                            completed=e.success,
-                            messages=e.status_messages))
+            q.task_done(
+                item_id,
+                e.outputs_ui,
+                status=execution.PromptQueue.ExecutionStatus(
+                    status_str="success" if e.success else "error", completed=e.success, messages=e.status_messages
+                ),
+            )
             if server.client_id is not None:
-                server.send_sync("executing", { "node": None, "prompt_id": prompt_id }, server.client_id)
+                server.send_sync("executing", {"node": None, "prompt_id": prompt_id}, server.client_id)
 
             current_time = time.perf_counter()
             execution_time = current_time - execution_start_time
@@ -155,7 +165,8 @@ def prompt_worker(q, server):
                 last_gc_collect = current_time
                 need_gc = False
 
-async def run(server, address='', port=8188, verbose=True, call_on_start=None):
+
+async def run(server, address="", port=8188, verbose=True, call_on_start=None):
     await asyncio.gather(server.start(address, port, verbose, call_on_start), server.publish_loop())
 
 
@@ -168,6 +179,7 @@ def hijack_progress(server):
         preview_method = args.preview_method
         if preview_image is not None and preview_method != LatentPreviewMethod.NoPreviews:
             server.send_sync(BinaryEventTypes.UNENCODED_PREVIEW_IMAGE, preview_image, server.client_id)
+
     comfy.utils.set_progress_bar_global_hook(hook)
 
 
@@ -178,7 +190,7 @@ def cleanup_temp():
 
 
 def load_extra_path_config(yaml_path):
-    with open(yaml_path, 'r') as stream:
+    with open(yaml_path, "r") as stream:
         config = yaml.safe_load(stream)
     for c in config:
         conf = config[c]
@@ -208,6 +220,7 @@ if __name__ == "__main__":
     if args.windows_standalone_build:
         try:
             import new_updater
+
             new_updater.update_windows_updater()
         except:
             pass
@@ -232,14 +245,21 @@ if __name__ == "__main__":
     server.add_routes()
     hijack_progress(server)
 
-    threading.Thread(target=prompt_worker, daemon=True, args=(q, server,)).start()
+    threading.Thread(
+        target=prompt_worker,
+        daemon=True,
+        args=(
+            q,
+            server,
+        ),
+    ).start()
 
     if args.output_directory:
         output_dir = os.path.abspath(args.output_directory)
         logging.info(f"Setting output directory to: {output_dir}")
         folder_paths.set_output_directory(output_dir)
 
-    #These are the default folders that checkpoints, clip and vae models will be saved to when using CheckpointSave, etc.. nodes
+    # These are the default folders that checkpoints, clip and vae models will be saved to when using CheckpointSave, etc.. nodes
     folder_paths.add_model_folder_path("checkpoints", os.path.join(folder_paths.get_output_directory(), "checkpoints"))
     folder_paths.add_model_folder_path("clip", os.path.join(folder_paths.get_output_directory(), "clip"))
     folder_paths.add_model_folder_path("vae", os.path.join(folder_paths.get_output_directory(), "vae"))
@@ -254,15 +274,26 @@ if __name__ == "__main__":
 
     call_on_start = None
     if args.auto_launch:
+
         def startup_server(scheme, address, port):
             import webbrowser
-            if os.name == 'nt' and address == '0.0.0.0':
-                address = '127.0.0.1'
+
+            if os.name == "nt" and address == "0.0.0.0":
+                address = "127.0.0.1"
             webbrowser.open(f"{scheme}://{address}:{port}")
+
         call_on_start = startup_server
 
     try:
-        loop.run_until_complete(run(server, address=args.listen, port=args.port, verbose=not args.dont_print_server, call_on_start=call_on_start))
+        loop.run_until_complete(
+            run(
+                server,
+                address=args.listen,
+                port=args.port,
+                verbose=not args.dont_print_server,
+                call_on_start=call_on_start,
+            )
+        )
     except KeyboardInterrupt:
         logging.info("\nStopped server")
 
