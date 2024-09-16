@@ -1471,6 +1471,7 @@ class SaveImage:
             if metadata is not None:
                 success, img = numpy_array_to_fpng(data)
                 if not success:
+                    print("Failed to save image with metadata, using add_metadata()")
                     img = Image.fromarray(data)
                 else:
                     with open(os.path.join(full_output_folder, file), "wb") as f:
@@ -1478,6 +1479,7 @@ class SaveImage:
             else:
                 success, img = numpy_array_to_fpng(data, filename=os.path.join(full_output_folder, file))
                 if not success:
+                    print("Failed to save image with fpng, using img.save() ")
                     img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
 
             if static_filename is not None:
