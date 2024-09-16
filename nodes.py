@@ -1440,10 +1440,11 @@ class SaveImage:
     CATEGORY = "image"
 
     def save_images(self, images, filename_prefix="ComfyUI", prompt=None, extra_pnginfo=None):
-        # Extract the suggested filename from the prompt
+        
+        # Extract the suggested filename from extra_pnginfo
         suggested_filename = None
-        if prompt and 'filename' in prompt:
-            suggested_filename = prompt['filename']
+        if extra_pnginfo and 'filename' in extra_pnginfo:
+            suggested_filename = extra_pnginfo['filename']
             # Sanitize the filename to prevent security issues
             suggested_filename = os.path.basename(suggested_filename)
         
