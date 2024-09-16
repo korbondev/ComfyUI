@@ -1459,6 +1459,7 @@ class SaveImage:
             temp_filename = base + '.tmp'
 
             # Save the image to the temporary file
+            print(f"Saving image to {temp_filename}")
             success, img = numpy_array_to_fpng(data, filename=temp_filename)
             if not success:
                 img.save(temp_filename, pnginfo=None, compress_level=1)
