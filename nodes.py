@@ -1444,16 +1444,15 @@ class SaveImage:
         # Extract the suggested filename from the prompt's '_meta' field
         suggested_filename = None
 
-        print(prompt)
+        #print(prompt)
 
-        if prompt and "Prompt" in prompt:
-            # Ensure '_meta' exists
-            if "_meta" in prompt["Prompt"]:
-                if "suggested_filename" in prompt["Prompt"]["_meta"]:
-                    suggested_filename = prompt["Prompt"]["_meta"]["suggested_filename"]
-                    # Sanitize the filename to prevent security issues
-                    suggested_filename = os.path.basename(suggested_filename)
-        
+        if prompt and 'Prompt' in prompt:
+            prompt_node = prompt['Prompt']
+            if '_meta' in prompt_node and 'suggested_filename' in prompt_node['_meta']:
+                suggested_filename = prompt_node['_meta']['suggested_filename']
+                # Sanitize the filename to prevent security issues
+                suggested_filename = os.path.basename(suggested_filename)
+
         # Use the output directory specified
         full_output_folder = self.output_dir
         results = list()
