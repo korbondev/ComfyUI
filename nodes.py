@@ -1466,12 +1466,10 @@ class SaveImage:
                     for x in extra_pnginfo:
                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
-
-
             if metadata is not None:
                 success, img = numpy_array_to_fpng(data)
                 if not success:
-                    print("Failed to save image with metadata, using add_metadata()")
+                    print("Failed to save image with fpng, we we can add_metadata()")
                     img = Image.fromarray(data)
                 else:
                     with open(os.path.join(full_output_folder, file), "wb") as f:
@@ -1485,6 +1483,7 @@ class SaveImage:
             if static_filename is not None:
                 os.rename(os.path.join(full_output_folder, file), static_filename)
                 # update file
+                # note: this breaks the history in ComfyUI
                 file = os.path.basename(static_filename)
 
             results.append({
