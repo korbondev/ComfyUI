@@ -1471,7 +1471,7 @@ class SaveImage:
 
             file = os.path.join(full_output_folder, file)
             # make a temporary file path to do the work
-            temp_file = file + ".tmp"
+            temp_file = "tmp." + file
 
             metadata = None
             if not args.disable_metadata:
