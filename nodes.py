@@ -1458,7 +1458,7 @@ class SaveImage:
                 # verbose
                 #print(f"Using suggested filename: {suggested_filename}")
 
-        for batch_number, image in enumerate(images):
+        for (batch_number, image) in enumerate(images):
             i = 255.0 * image.cpu().numpy()
 
             data = np.clip(i, 0, 255).astype(np.uint8)
@@ -1504,7 +1504,7 @@ class SaveImage:
             #print(f"Saved image to {file} from batch {batch_number}")
 
             results.append({
-                "filename": file,
+                "filename": os.path.basename(file), # just the filename is needed
                 "subfolder": subfolder,
                 "type": self.type
             })
