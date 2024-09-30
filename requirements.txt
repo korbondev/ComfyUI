@@ -16,6 +16,6 @@ spandrel
 soundfile
 
 # added
-numpy
+numpy==1.*
 git+https://github.com/K0lb3/fpng_py.git
 pypng
