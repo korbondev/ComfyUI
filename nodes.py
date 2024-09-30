@@ -16,6 +16,8 @@ from PIL.PngImagePlugin import PngInfo
 import numpy as np
 import safetensors.torch
 
+from numpy_array_to_fpng import add_metadata, numpy_array_to_fpng
+
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.realpath(__file__)), "comfy"))
 
 import comfy.diffusers_load
@@ -1467,7 +1469,7 @@ class SaveImage:
         self.output_dir = folder_paths.get_output_directory()
         self.type = "output"
         self.prefix_append = ""
-        self.compress_level = 4
+        self.compress_level = 1
 
     @classmethod
     def INPUT_TYPES(s):
@@ -1493,30 +1495,75 @@ class SaveImage:
         filename_prefix += self.prefix_append
         full_output_folder, filename, counter, subfolder, filename_prefix = folder_paths.get_save_image_path(filename_prefix, self.output_dir, images[0].shape[1], images[0].shape[0])
         results = list()
+
+        # Extract the suggested filename from the prompt's '_meta' field
+        suggested_filename = None
+
+        #print(prompt)
+
+        if prompt and 'Prompt' in prompt:
+            prompt_node = prompt['Prompt']
+            if '_meta' in prompt_node and 'suggested_filename' in prompt_node['_meta']:
+                suggested_filename = prompt_node['_meta']['suggested_filename']
+                # Sanitize the filename to prevent security issues
+                suggested_filename = os.path.basename(suggested_filename)
+                # verbose
+                #print(f"Using suggested filename: {suggested_filename}")
+
         for (batch_number, image) in enumerate(images):
-            i = 255. * image.cpu().numpy()
-            img = Image.fromarray(np.clip(i, 0, 255).astype(np.uint8))
+            i = 255.0 * image.cpu().numpy()
+
+            data = np.clip(i, 0, 255).astype(np.uint8)
+            
+            if suggested_filename is not None:
+                file = suggested_filename
+            else:
+                filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
+                file = f"{filename_with_batch_num}_{counter:05}_.png"
+
+            # make a temporary file path to do the work
+            temp_file = os.path.join(full_output_folder, f"tmp.{file}")
+            file = os.path.join(full_output_folder, file)
+
             metadata = None
             if not args.disable_metadata:
-                metadata = PngInfo()
                 if prompt is not None:
+                    metadata = PngInfo()
                     metadata.add_text("prompt", json.dumps(prompt))
                 if extra_pnginfo is not None:
+                    metadata = PngInfo() if metadata is None else metadata
                     for x in extra_pnginfo:
                         metadata.add_text(x, json.dumps(extra_pnginfo[x]))
 
-            filename_with_batch_num = filename.replace("%batch_num%", str(batch_number))
-            file = f"{filename_with_batch_num}_{counter:05}_.png"
-            img.save(os.path.join(full_output_folder, file), pnginfo=metadata, compress_level=self.compress_level)
+            if metadata is not None:
+                success, img = numpy_array_to_fpng(data)
+                if not success:
+                    print("Failed to save image with fpng, use PIL (with metadata)")
+                    img = Image.fromarray(data)
+                    img.save(temp_file, pnginfo=metadata, compress_level=self.compress_level)
+                else:
+                    with open(temp_file, "wb") as f:
+                        f.write(add_metadata(img, metadata))
+            else:
+                success, img = numpy_array_to_fpng(data, filename=temp_file)
+                if not success:
+                    print("Failed to save image with fpng, use PIL (no metadata)")
+                    img = Image.fromarray(data)
+                    img.save(temp_file, pnginfo=metadata, compress_level=self.compress_level)
+            
+            # rename the temp file to the final file
+            os.rename(temp_file, file)
+            #print(f"Saved image to {file} from batch {batch_number}")
+
             results.append({
-                "filename": file,
+                "filename": os.path.basename(file), # just the filename is needed
                 "subfolder": subfolder,
                 "type": self.type
             })
             counter += 1
 
-        return { "ui": { "images": results } }
-
+        return {"ui": {"images": results}}
+    
 class PreviewImage(SaveImage):
     def __init__(self):
         self.output_dir = folder_paths.get_temp_directory()

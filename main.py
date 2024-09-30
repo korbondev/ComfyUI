@@ -5,7 +5,7 @@ import os
 import importlib.util
 import folder_paths
 import time
-from comfy.cli_args import args
+from comfy.cli_args import args, LatentPreviewMethod
 from app.logger import setup_logger
 
 
@@ -113,6 +113,7 @@ def prompt_worker(q, server):
     while True:
         timeout = 1000.0
         if need_gc:
+            current_time = time.perf_counter()
             timeout = max(gc_collect_interval - (current_time - last_gc_collect), 0.0)
 
         queue_item = q.get(timeout=timeout)
@@ -123,6 +124,31 @@ def prompt_worker(q, server):
             server.last_prompt_id = prompt_id
 
             e.execute(item[2], prompt_id, item[3], item[4])
+            if not e.success:
+                for sm in e.status_messages:                    
+                    #logging.info(f"{sm}")
+                    if "No face detected" in f"{sm}":
+                        prompt = item[2]
+                        #logging.info(f"Prompt: {prompt}")
+                        if prompt and 'Prompt' in prompt:
+                            prompt_node = prompt['Prompt']
+                            if '_meta' in prompt_node and 'suggested_filename' in prompt_node['_meta']:
+                                suggested_filename = prompt_node['_meta']['suggested_filename']
+                                suggested_filename = os.path.basename(suggested_filename)                                
+                                
+                                #logging.info(f"Making input: 'init-instantid.png' the output: '{suggested_filename}'")                                
+                                #input_dir = folder_paths.get_input_directory()
+                                temp_dir = folder_paths.get_temp_directory()                                
+                                os.makedirs(temp_dir, exist_ok=True)
+                                # os.rename(os.path.join(input_dir, 'init-instantid.png'), os.path.join(temp_dir, suggested_filename))
+                                # logging.info(f"File moved: {os.path.isfile(os.path.join(temp_dir, suggested_filename))}")
+                                
+                                # write an empty file in the suggested_filename
+                                logging.info(f"Writing an empty PNG to: '{suggested_filename}'")  
+                                with open(os.path.join(temp_dir, suggested_filename), 'wb') as f:
+                                    f.write(b'')
+                                
+
             need_gc = True
             q.task_done(item_id,
                         e.history_result,
@@ -169,7 +195,8 @@ def hijack_progress(server):
         progress = {"value": value, "max": total, "prompt_id": server.last_prompt_id, "node": server.last_node_id}
 
         server.send_sync("progress", progress, server.client_id)
-        if preview_image is not None:
+        preview_method = args.preview_method
+        if preview_image is not None and preview_method != LatentPreviewMethod.NoPreviews:
             server.send_sync(BinaryEventTypes.UNENCODED_PREVIEW_IMAGE, preview_image, server.client_id)
     comfy.utils.set_progress_bar_global_hook(hook)
 
