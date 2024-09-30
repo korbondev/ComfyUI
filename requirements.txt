@@ -1,7 +1,3 @@
-torch
-torchsde
-torchvision
-torchaudio
 einops
 transformers>=4.28.1
 tokenizers>=0.13.3
@@ -18,3 +14,8 @@ psutil
 kornia>=0.7.1
 spandrel
 soundfile
+
+# added
+numpy
+git+https://github.com/K0lb3/fpng_py.git
+pypng
